@@ -32,6 +32,11 @@ SALT = os.getenv("ANALYTICS_SALT", "cambiar-en-produccion")
 JWT_SECRET = os.getenv("JWT_SECRET", "cambiar-en-produccion")
 JWT_HOURS = int(os.getenv("JWT_HOURS", "8"))
 USERS = {os.getenv("DASHBOARD_USER", "admin"): os.getenv("DASHBOARD_PASSWORD", "medicai")}
+# Cuentas adicionales opcionales, formato "usuario:clave,usuario2:clave2"
+for _pair in os.getenv("DASHBOARD_EXTRA_USERS", "").split(","):
+    _user, _sep, _pwd = _pair.strip().partition(":")
+    if _user and _sep and _pwd:
+        USERS.setdefault(_user, _pwd)
 
 
 def pseudonym(user_id: str | None) -> str | None:
