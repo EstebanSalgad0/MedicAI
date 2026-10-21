@@ -248,8 +248,13 @@ def seed_analytics(borrar: bool) -> None:
             if survey and rng.random() < 0.7:
                 t += timedelta(minutes=rng.randint(1, 20))
                 interaction(t, uid, "orchestrator", "option")
+                ratings = {  # cada trámite con su propio nivel de satisfacción
+                    "agendamiento": {5: 55, 4: 30, 3: 9, 2: 4, 1: 2}, "recordatorios": {5: 60, 4: 28, 3: 8, 2: 3, 1: 1},
+                    "orientacion": {5: 42, 4: 32, 3: 14, 2: 8, 1: 4}, "medicamentos": {5: 45, 4: 30, 3: 13, 2: 7, 1: 5},
+                    "derivacion": {5: 50, 4: 30, 3: 12, 2: 5, 1: 3}}[svc]
                 ev(t, "survey_response", "orchestrator", uid,
-                   rating=pick({5: 52, 4: 30, 3: 10, 2: 5, 1: 3}))
+                   center=center if svc in ("agendamiento", "medicamentos") else None,
+                   rating=pick(ratings), flow_service=svc)
 
         # respuestas a recordatorios de tomas de quienes ya los tienen activos
         for uid, doses in list(reminder_users.items()):

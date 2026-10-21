@@ -32,7 +32,7 @@ export function Legend({ items, box }) {
 }
 
 /** Serie temporal: una o más líneas sobre el mismo eje (nunca doble eje). */
-export function TimeLines({ data, series, format = fmt.int, target, height = 220 }) {
+export function TimeLines({ data, series, format = fmt.int, target, height = 220, domain }) {
   if (!data?.length) return <div className="empty">Sin datos en el período.</div>;
   return (
     <>
@@ -41,7 +41,8 @@ export function TimeLines({ data, series, format = fmt.int, target, height = 220
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="var(--grid)" vertical={false} />
           <XAxis dataKey="date" {...axis} tickFormatter={fmt.date} minTickGap={24} />
-          <YAxis {...axis} axisLine={false} width={format === fmt.ms ? 64 : 48} tickFormatter={format} allowDecimals={false} />
+          <YAxis {...axis} axisLine={false} width={format === fmt.ms ? 64 : 48} tickFormatter={format} allowDecimals={false}
+            domain={domain || [0, "auto"]} />
           {target && (
             <ReferenceLine y={target.value} stroke="var(--critical)" strokeWidth={1}
               label={{ value: target.label, position: "insideTopRight", fill: "var(--ink-2)", fontSize: 12 }} />

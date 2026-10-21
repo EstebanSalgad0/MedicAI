@@ -160,3 +160,38 @@ def intents(events: Iterable[Event]) -> list[dict[str, Any]]:
 
 def local_day(ts: datetime) -> str:
     return ts.replace(tzinfo=timezone.utc).astimezone(TZ).date().isoformat()
+
+
+def _rating_block(rs: list[int]) -> dict[str, Any]:
+    n = len(rs)
+    return {"n": n, "avg": round(mean(rs), 2) if rs else None,
+            "distribution": {str(r): rs.count(r) for r in range(1, 6)},
+            "satisfied_rate": round(sum(1 for r in rs if r >= 4) / n, 4) if n else None,
+            "dissatisfied_rate": round(sum(1 for r in rs if r <= 2) / n, 4) if n else None}
+
+
+def satisfaction(events: Iterable[Event], limit: int = 50) -> dict[str, Any]:
+    """Encuesta post-atención: promedio, reparto, evolución diaria, por trámite y últimas respuestas."""
+    ev = list(events)
+    resp = [e for e in ev if e.type == "survey_response" and e.props.get("rating")]
+    sent = sum(1 for e in ev if e.type == "interaction" and e.props.get("survey_sent"))
+    ratings = [int(e.props["rating"]) for e in resp]
+    by_day: dict[str, list[int]] = defaultdict(list)
+    by_service: dict[str, list[int]] = defaultdict(list)
+    for e in resp:
+        by_day[local_day(e.ts)].append(int(e.props["rating"]))
+        by_service[e.props.get("flow_service") or "sin_dato"].append(int(e.props["rating"]))
+    out = _rating_block(ratings)
+    t = TARGETS["satisfaction_avg"]
+    out.update({
+        "sent": sent,
+        "response_rate": round(len(ratings) / sent, 4) if sent else None,
+        "target": {**t, "status": status("satisfaction_avg", out["avg"])},
+        "by_day": [{"date": d, "avg": round(mean(v), 2), "n": len(v)} for d, v in sorted(by_day.items())],
+        "by_service": sorted(({"service": s, **_rating_block(v)} for s, v in by_service.items()),
+                             key=lambda x: -x["n"]),
+        "recent": [{"ts": e.ts.replace(tzinfo=timezone.utc).isoformat(), "rating": int(e.props["rating"]),
+                    "service": e.props.get("flow_service"), "channel": e.channel, "center": e.center,
+                    "user": e.user_hash} for e in sorted(resp, key=lambda x: x.ts, reverse=True)[:limit]],
+    })
+    return out

@@ -4,15 +4,18 @@ import Resumen from "./pages/Resumen.jsx";
 import Agenda from "./pages/Agenda.jsx";
 import Farmacia from "./pages/Farmacia.jsx";
 import Simulador from "./pages/Simulador.jsx";
+import Satisfaccion from "./pages/Satisfaccion.jsx";
 
 const ICONS = {
   resumen: "M4 19V10M10 19V5M16 19v-6M22 19H2",
+  satisfaccion: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9Z",
   agenda: "M7 3v3M17 3v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
   farmacia: "m10.5 20.5-7-7a4.95 4.95 0 0 1 7-7l7 7a4.95 4.95 0 0 1-7 7ZM7 10l7 7",
   simulador: "M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z",
 };
 const PAGES = [
   { id: "resumen", label: "Indicadores", el: Resumen },
+  { id: "satisfaccion", label: "Satisfacción", el: Satisfaccion },
   { id: "agenda", label: "Agenda", el: Agenda },
   { id: "farmacia", label: "Farmacia", el: Farmacia },
   { id: "simulador", label: "Simulador", el: Simulador },

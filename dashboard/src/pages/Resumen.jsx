@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, download, fmt, SERVICE_LABEL } from "../api.js";
 import Kpi, { TargetCard } from "../components/Kpi.jsx";
-import Info from "../components/Info.jsx";
+import { Card, Section } from "../components/Section.jsx";
 import { HBars, InlineBar, MiniTrend, SegmentBar, TimeLines } from "../components/charts.jsx";
 
 const PERIODS = [7, 30, 90];
@@ -39,36 +39,6 @@ function rangeLabel(days) {
   start.setDate(end.getDate() - (days - 1));
   const f = (d) => d.toLocaleDateString("es-CL", { day: "numeric", month: "short" });
   return `${f(start)} – ${f(end)}`;
-}
-
-function Section({ title, desc, aside, children }) {
-  return (
-    <section className="section">
-      <div className="section-head">
-        <div>
-          <h2>{title}</h2>
-          {desc && <p>{desc}</p>}
-        </div>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function Card({ title, desc, info, children, className = "" }) {
-  return (
-    <div className={`card ${className}`}>
-      <div className="card-head">
-        <div>
-          <h3>{title}</h3>
-          {desc && <p>{desc}</p>}
-        </div>
-        {info && <Info>{info}</Info>}
-      </div>
-      {children}
-    </div>
-  );
 }
 
 export default function Resumen() {
@@ -296,7 +266,8 @@ export default function Resumen() {
               <Card title="Orientación de síntomas" desc="Nivel de atención sugerido">
                 <SegmentBar items={NIVEL.map((n) => ({ ...n, value: k.triage[n.key] || 0 }))} />
               </Card>
-              <Card title="Satisfacción" desc="Respuestas a la encuesta (1 a 5)">
+              <Card title="Satisfacción" desc="Respuestas a la encuesta (1 a 5)"
+                action={<a className="link" href="#satisfaccion">Ver detalle →</a>}>
                 <HBars labelWidth={92}
                   data={[[5, "Excelente"], [4, "Buena"], [3, "Regular"], [2, "Mala"], [1, "Muy mala"]].map(([r, l]) => ({ name: `${r} · ${l}`, n: k.satisfaction_avg.distribution[r] || 0 }))}
                   category="name" series={[{ key: "n", label: "Respuestas", color: "var(--series-1)" }]} />

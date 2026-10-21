@@ -271,3 +271,9 @@ td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .split { grid-template-columns: minmax(0, 1.7fr) minmax(320px, 1fr); align-items: start; }
 @media (max-width: 1100px) { .split { grid-template-columns: 1fr; } }
 td.num { white-space: nowrap; }
+
+/* calificaciones */
+.stars { color: var(--warning); letter-spacing: 1px; font-size: 14px; }
+.stars .off { color: var(--grid); }
+.link { font-size: 13px; color: var(--brand); text-decoration: none; white-space: nowrap; margin-left: auto; }
+.link:hover { text-decoration: underline; }

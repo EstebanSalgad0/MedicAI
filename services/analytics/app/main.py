@@ -150,6 +150,11 @@ def get_intents(f: Filters = Depends()):
     return kpis.intents(load(*f.args))
 
 
+@app.get("/satisfaction", tags=["dashboard"])
+def get_satisfaction(f: Filters = Depends(), limit: int = Query(50, ge=1, le=500)):
+    return kpis.satisfaction(load(*f.args), limit)
+
+
 @app.get("/events", tags=["dashboard"])
 def recent(limit: int = Query(50, le=500), type: str | None = None):
     q = select(Event).order_by(Event.id.desc()).limit(limit)
