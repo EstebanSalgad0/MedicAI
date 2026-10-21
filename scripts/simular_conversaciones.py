@@ -33,8 +33,10 @@ GUIONES = {
     "recordatorio": [
         ("texto", "recuérdame tomar el losartán", None),
         ("texto", "Losartán 50 mg", None),
+        ("opcion", "rec:dose_q:1 comprimido", None),
         ("opcion", "rec:freq:2", None),
         ("texto", "08:00", None),
+        ("opcion", "rec:rx:none", None),
         ("opcion", "rec:save:yes", "activos"),
     ],
     "orientacion": [
@@ -58,6 +60,58 @@ GUIONES = {
         ("opcion", 1, None),
         ("opcion", "med:hour:08:00", "Listo"),
         ("opcion", "med:link:no", None),
+    ],
+    "hora_hospital": [
+        ("opcion", "agd:start", None),
+        ("opcion", "agd:place:hrt", None),
+        ("opcion", "agd:hesp:cardiologia", None),
+        ("opcion", "agd:deriv:yes", None),
+        ("opcion", "agd:day:proxima", None),
+        ("opcion", 0, None),
+        ("opcion", "agd:confirm:yes", "HRT-"),
+    ],
+    "triaje": [
+        ("texto", "tengo fiebre y tos", None),
+        ("opcion", "ori:t:edad:18-59", None),
+        ("opcion", "ori:t:sin:listo", None),
+        ("opcion", "ori:t:dur:1-3", None),
+        ("opcion", "ori:t:alarma:no", "Nivel"),
+    ],
+    "resultados": [
+        ("opcion", "res:start", "RUN"),
+        ("texto", "12.345.678-5", None),
+        ("texto", "01-01-1960", "no muestro valores"),
+    ],
+    "fonasa": [
+        ("opcion", "ate:fonasa", None),
+        ("opcion", "ate:fonasa:certificado", "gratis"),
+    ],
+    "salud_mental": [
+        ("opcion", "ori:animo", None),
+        ("opcion", "ori:animo:2", "Respiración"),
+    ],
+    "hablar_persona": [
+        ("opcion", "ate:humano", None),
+        ("opcion", "ate:humano:agenda", None),
+        ("texto", "Necesito ayuda para cambiar una hora", "solicitud"),
+    ],
+    "cuidador": [
+        ("opcion", "ate:cui", None),
+        ("opcion", "ate:cui:new", None),
+        ("texto", "Camila Soto", None),
+        ("texto", "12.345.678-5", None),
+        ("texto", "Juan Soto", None),
+        ("texto", "11.111.111-1", None),
+        ("opcion", "ate:cui:rel:hijo", None),
+        ("opcion", "ate:cui:save:yes", None),
+        ("opcion", 0, "Ahora gestionas"),
+        ("opcion", "ate:cui:exit", "Volviste"),
+    ],
+    "info_hospital": [
+        ("opcion", "ate:info", "Admisión"),
+    ],
+    "modo_gestion": [
+        ("texto", "¿cómo va el ausentismo?", "Ausentismo"),
     ],
     "alarma": [
         ("texto", "no puedo respirar", "131"),

@@ -16,7 +16,7 @@ cd C:\Users\salga\OneDrive\Escritorio\Chatbot_MedicAI-main
 | # | Qué hacer | Comando / acción |
 |---|---|---|
 | 1 | Abrir Docker Desktop y esperar a que diga *Engine running* | (menú Inicio → Docker Desktop) |
-| 2 | Levantar los 15 contenedores | `docker compose up -d` |
+| 2 | Levantar los 17 contenedores | `docker compose up -d` |
 | 3 | Confirmar que todo está sano | `docker compose ps` |
 | 4 | Abrir el túnel público (en otra terminal, dejarla abierta) | `ngrok http 8080` |
 | 5 | Confirmar que la URL de ngrok es la misma registrada en Meta | ver [paso 4](#paso-4-abrir-el-túnel-de-ngrok) |
@@ -133,6 +133,23 @@ WhatsApp rechazó el mensaje (401): ... Session has expired ...
 ```powershell
 docker compose up -d whatsapp-gateway
 ```
+
+---
+
+## Ajustes del Hospital Regional y del modo gestión
+
+Variables del `.env` (ver `.env.example`):
+
+| Variable | Para qué sirve |
+|---|---|
+| `HOSPITAL_DIRECCION`, `HOSPITAL_MESA_AYUDA`, `HOSPITAL_MESA_HORARIO`, `HOSPITAL_TELEFONO_UCI` | Datos que muestra el bot. **Verifícalos con el hospital**: la dirección aparece en la tarjeta de emergencia |
+| `GESTION_USERS` | Números de WhatsApp que pueden usar el *modo gestión* (preguntar por camas, ausentismo, urgencias…), separados por coma |
+| `GESTION_SIMULADOR` | `true` permite usar el modo gestión desde el simulador del dashboard |
+| `GAP_OFFER_MINUTES` | Minutos que tiene un paciente para tomar un cupo liberado antes de que pase al siguiente |
+| `REMINDER_LEAD_MINUTES` | Anticipación del aviso de cada toma de medicamento |
+| `LIS_MODE` | `demo` = laboratorio simulado para resultados de exámenes |
+
+Después de cambiarlas: `docker compose up -d`.
 
 ---
 

@@ -7,14 +7,22 @@ atributos comprometidos en la formulación FONDEF IDeA I+D.
 
 | Microservicio | Qué resuelve para el paciente |
 |---|---|
-| `ms-agendamiento` | Reservar, reagendar y cancelar horas de APS; recordatorio con confirmación de asistencia el día anterior |
-| `ms-recordatorios` | Recordatorios de toma de medicamentos; cada dosis se confirma (tomada / omitida / pospuesta) → indicador de adherencia |
-| `ms-orientacion` | Orientación inicial de síntomas en 12 categorías: sugiere **nivel de atención** (urgencia, prioritario, CESFAM, autocuidado). No diagnostica |
+| `ms-agendamiento` | Horas en el **Hospital Regional de Talca** (especialidades, con verificación de interconsulta, código HRT-XXXXXX y aviso GES) y en **CESFAM**; reagendar y cancelar; recordatorios 48 h y 24 h; **lista de espera y fill-the-gap** (el cupo liberado se ofrece al siguiente compatible) |
+| `ms-recordatorios` | Recordatorios de toma con dosis, aviso 10 min antes y confirmación por dosis (adherencia); aviso de **renovación de receta** 5 días antes |
+| `ms-orientacion` | **Triaje informativo** (edad, síntomas, duración, pregunta de alarma → nivel alto/medio/bajo con acción concreta), orientación detallada por categoría y **chequeo de ánimo** con derivación a salud mental. No diagnostica |
 | `ms-derivacion` | Guía de ruta para interconsultas (GES / no GES), exámenes, recetas y derivaciones urgentes, con seguimiento a 7 días |
-| `ms-medicamentos` | Disponibilidad de fármacos por CESFAM, retiros programados (únicos o cíclicos) y aviso de reposición de stock |
+| `ms-medicamentos` | Disponibilidad de fármacos en CESFAM y **Farmacia Hospitalaria**, retiros programados y aviso de reposición de stock |
+| `ms-resultados` | Estado de **exámenes** (disponible / en proceso) tras verificar RUN y fecha de nacimiento, y aviso automático al validarse. Nunca muestra valores |
+| `ms-atencion` | **Trámites FONASA**, información del hospital, visitas y preparación de exámenes, **hablar con una persona** (la solicitud llega con el resumen de la conversación) y **modo cuidador** |
 
-Más el núcleo: `whatsapp-gateway`, `orchestrator`, `nlu` + `nlu-rasa`, `analytics`, `scheduler`,
-`dashboard` y un `gateway` nginx, sobre PostgreSQL (una base por servicio) y Redis.
+Más el núcleo: `whatsapp-gateway`, `orchestrator` (menú, detector de emergencias, modo cuidador y **modo gestión**
+con analítica conversacional), `nlu` + `nlu-rasa`, `analytics`, `scheduler`, `dashboard` y un `gateway` nginx,
+sobre PostgreSQL (una base por servicio) y Redis.
+
+El **dashboard** tiene: *Hospital* (tablero de gestión en vivo: camas, urgencias, ausentismo, fill-the-gap, chatbot,
+pabellones, listas de espera, alertas y preguntas en lenguaje natural), *Indicadores*, *Satisfacción*, *Agenda*,
+*Farmacia*, *Contacto* (bandeja de solicitudes) y *Simulador*. En el prototipo, camas, urgencias, pabellones y listas
+de espera son **datos simulados**; el resto son datos reales del sistema.
 Detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) y relación con la postulación en
 [docs/ALINEACION_FORMULACION.md](docs/ALINEACION_FORMULACION.md).
 
