@@ -82,6 +82,16 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/medicamentos
 
+  # Túnel HTTPS público para el webhook (pruebas sin dominio propio):
+  #   docker compose --profile tunel up -d tunel && docker compose logs tunel | findstr trycloudflare
+  tunel:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunel"]
+    command: ["tunnel", "--no-autoupdate", "--url", "http://gateway:80"]
+    restart: unless-stopped
+    networks: [backend]
+    depends_on: [gateway]
+
   # ---------------- datos y soporte ----------------
   analytics:
     <<: *py

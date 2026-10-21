@@ -66,3 +66,26 @@ def test_envio_interno_a_simulador_y_bandeja():
     assert r.json()["sent"] == 1
     assert client.get("/outbox/web:abc").json()["messages"][0]["text"] == "hola"
     assert client.get("/outbox/web:abc").json()["messages"] == []
+
+
+def test_proveedor_360dialog(monkeypatch):
+    from app import providers
+    monkeypatch.setenv("D360_API_KEY", "k123")
+    monkeypatch.setenv("WHATSAPP_PROVIDER", "auto")
+    p = providers.load()
+    assert p.name == "360dialog" and p.configured
+    assert p.send_url == "https://waba-v2.360dialog.io/messages" and p.headers == {"D360-API-KEY": "k123"}
+    monkeypatch.delenv("D360_API_KEY")
+    assert providers.load().name == "meta" and not providers.load().configured
+
+
+def test_secreto_compartido_del_webhook(monkeypatch):
+    monkeypatch.setattr(main, "WEBHOOK_SECRET", "s3cr3t")
+    monkeypatch.setattr(main, "APP_SECRET", "")
+    body = {"messages": [{"id": "wamid.flat", "from": "569", "type": "text", "text": {"body": "hola"}}],
+            "contacts": [{"wa_id": "569", "profile": {"name": "Luis"}}]}
+    assert client.post("/webhook", json=body).status_code == 401
+    calls = []
+    with patch.object(main, "handle_inbound", lambda item, t: calls.append(item)):
+        r = client.post("/webhook", json=body, headers={"X-MedicAI-Webhook-Secret": "s3cr3t"})
+    assert r.status_code == 200 and calls[0]["text"] == "hola" and calls[0]["name"] == "Luis"

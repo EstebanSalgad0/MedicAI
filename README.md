@@ -34,16 +34,36 @@ docker compose ps             # todos los servicios deben quedar "healthy" / "ru
 - **Sin credenciales de WhatsApp** el gateway arranca en modo `DRY_RUN`: procesa todo y registra los
   mensajes en el log en vez de enviarlos.
 
-### Conectar WhatsApp Business (Cloud API)
+### Conectar WhatsApp con 360dialog
 
-1. En Meta for Developers, copia el *token de acceso*, el *Phone number ID* y el *App Secret* al `.env`
-   (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET`) y define un `WHATSAPP_VERIFY_TOKEN`.
-2. Expón el puerto 8080 con HTTPS (proxy del servidor institucional o un túnel) y registra el webhook
-   `https://<dominio>/webhook` con el mismo verify token. Suscribe el campo `messages`.
-3. `docker compose up -d whatsapp-gateway` y escribe «hola» al número.
+1. **Cuenta y número.** Regístrate en [360dialog](https://www.360dialog.com) y conecta un número que no esté
+   usado en WhatsApp (el alta pide iniciar sesión con Facebook para crear la cuenta de WhatsApp Business;
+   idealmente a nombre de la Universidad). En el *360dialog Hub* genera la **API key** del número.
+2. **`.env`:**
+   ```env
+   D360_API_KEY=<api key del Hub>
+   WEBHOOK_SECRET=<cadena aleatoria larga>
+   ```
+   y reinicia el gateway: `docker compose up -d whatsapp-gateway`.
+3. **URL pública HTTPS.** 360dialog exige HTTPS con certificado válido. Con un servidor y dominio
+   institucional, publica el puerto 8080 detrás de su proxy. Para probar desde tu PC, usa el túnel incluido:
+   ```bash
+   docker compose --profile tunel up -d tunel
+   docker compose logs tunel          # copia la URL https://xxxx.trycloudflare.com
+   ```
+   (La URL del túnel cambia cada vez que se reinicia; para el piloto usa un dominio fijo.)
+4. **Registrar el webhook:**
+   ```bash
+   docker compose exec whatsapp-gateway python -m app.register_webhook https://xxxx.trycloudflare.com/webhook
+   ```
+5. Escribe «hola» al número. En `docker compose logs -f whatsapp-gateway` debe aparecer
+   «WhatsApp conectado vía 360dialog» al iniciar.
 
 > Los recordatorios proactivos (tomas, horas, retiros) fuera de la ventana de 24 h de WhatsApp requieren
-> **plantillas aprobadas por Meta**. Es un trámite a gestionar antes del piloto con pacientes.
+> **plantillas aprobadas**, que se gestionan desde el 360dialog Hub antes del piloto con pacientes.
+
+Si prefieres la Cloud API de Meta directa, completa `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_APP_SECRET` y `WHATSAPP_VERIFY_TOKEN` y registra `https://<dominio>/webhook` en Meta for Developers.
 
 ### Activar el LLM de respaldo (opcional)
 

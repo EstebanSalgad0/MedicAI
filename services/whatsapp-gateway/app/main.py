@@ -1,4 +1,4 @@
-"""Gateway de canales: WhatsApp Cloud API (entrada y salida) y bandeja del simulador web."""
+"""Gateway de canales: WhatsApp (Meta Cloud API o 360dialog), entrada y salida, y bandeja del simulador web."""
 from __future__ import annotations
 
 import hashlib
@@ -15,6 +15,7 @@ from medicai_common import events
 from medicai_common.messages import Message
 from medicai_common.service import INTERNAL_TOKEN, create_service, require_internal, setup_logging
 
+from . import providers
 from .whatsapp import parse_inbound, to_payloads
 
 SERVICE = "whatsapp-gateway"
@@ -22,12 +23,12 @@ log = setup_logging(SERVICE)
 app = create_service(SERVICE, "Webhook de WhatsApp Business, envío con reintentos y bandeja del simulador web.")
 
 VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN") or os.getenv("VERIFY_TOKEN", "")
-APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")
-TOKEN = os.getenv("WHATSAPP_TOKEN", "")
-PHONE_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
-API_VERSION = os.getenv("WHATSAPP_API_VERSION", "v21.0")
-SEND_URL = os.getenv("WHATSAPP_URL") or f"https://graph.facebook.com/{API_VERSION}/{PHONE_ID}/messages"
-DRY_RUN = os.getenv("WHATSAPP_DRY_RUN", "auto").lower() == "true" or not (TOKEN and (PHONE_ID or os.getenv("WHATSAPP_URL")))
+APP_SECRET = os.getenv("WHATSAPP_APP_SECRET", "")  # firma de Meta (solo proveedor meta)
+# 360dialog no firma los webhooks: al registrar la URL se le pide enviar este secreto como header.
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+WEBHOOK_SECRET_HEADER = "X-MedicAI-Webhook-Secret"
+PROVIDER = providers.load()
+DRY_RUN = os.getenv("WHATSAPP_DRY_RUN", "auto").lower() == "true" or not PROVIDER.configured
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://orchestrator:8000")
 
 if os.getenv("REDIS_URL"):
@@ -39,7 +40,10 @@ else:  # desarrollo
     _seen: set[str] = set()
 
 if DRY_RUN:
-    log.warning("WhatsApp en modo DRY_RUN: los mensajes se registran pero no se envían a Meta")
+    log.warning("WhatsApp en modo DRY_RUN (%s sin credenciales): los mensajes se registran pero no se envían",
+                PROVIDER.name)
+else:
+    log.info("WhatsApp conectado vía %s", PROVIDER.name)
 
 
 # ---------- utilidades ----------
@@ -72,8 +76,7 @@ def wa_post(payload: dict, attempts: int = 3) -> bool:
     delay = 0.5
     for i in range(attempts):
         try:
-            r = httpx.post(SEND_URL, json=payload, timeout=10,
-                           headers={"Authorization": f"Bearer {TOKEN}"})
+            r = httpx.post(PROVIDER.send_url, json=payload, timeout=10, headers=PROVIDER.headers)
             if r.status_code < 300:
                 return True
             if r.status_code not in (429, 500, 502, 503, 504):
@@ -134,7 +137,9 @@ def handle_inbound(item: dict, received_at: float) -> None:
 @app.post("/webhook", tags=["whatsapp"])
 async def receive(request: Request, background: BackgroundTasks):
     raw = await request.body()
-    if APP_SECRET:
+    if WEBHOOK_SECRET and not hmac.compare_digest(request.headers.get(WEBHOOK_SECRET_HEADER, ""), WEBHOOK_SECRET):
+        raise HTTPException(401, "Secreto de webhook inválido")
+    if APP_SECRET and PROVIDER.name == "meta":
         sig = request.headers.get("X-Hub-Signature-256", "")
         expected = "sha256=" + hmac.new(APP_SECRET.encode(), raw, hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
@@ -185,4 +190,6 @@ def outbox(user_id: str):
 
 @app.get("/status", tags=["infra"])
 def status():
-    return {"dry_run": DRY_RUN, "api_version": API_VERSION, "signature_check": bool(APP_SECRET)}
+    return {"provider": PROVIDER.name, "dry_run": DRY_RUN,
+            "meta_signature_check": bool(APP_SECRET) and PROVIDER.name == "meta",
+            "shared_secret_check": bool(WEBHOOK_SECRET)}

@@ -51,6 +51,9 @@ def to_payloads(to: str, m: Message) -> list[dict[str, Any]]:
 def parse_inbound(body: dict[str, Any]) -> list[dict[str, Any]]:
     """Extrae los mensajes de un webhook (puede traer varios, o solo estados de entrega)."""
     out = []
+    if "messages" in body and "entry" not in body:
+        # formato plano (On-Premise / algunos BSP): se normaliza a la estructura de la Cloud API
+        body = {"entry": [{"changes": [{"value": body}]}]}
     for entry in body.get("entry", []):
         for change in entry.get("changes", []):
             value = change.get("value", {})
