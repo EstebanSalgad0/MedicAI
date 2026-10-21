@@ -24,6 +24,7 @@ export default function Agenda() {
   const [to, setTo] = useState(today(14));
   const [rows, setRows] = useState([]);
   const [stats, setStats] = useState(null);
+  const [waitlist, setWaitlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -33,9 +34,10 @@ export default function Agenda() {
     setLoading(true);
     Promise.all([
       api("/agendamiento/appointments", { params: { center_id: center, status, date_from: from, date_to: to } }),
-      api("/agendamiento/stats"),
+      api("/agendamiento/stats", { params: { center_id: center } }),
+      api("/agendamiento/waitlist"),
     ])
-      .then(([r, s]) => { setRows(r); setStats(s); setErr(""); })
+      .then(([r, s, w]) => { setRows(r); setStats(s); setWaitlist(w); setErr(""); })
       .catch((e) => setErr(e.message))
       .finally(() => setLoading(false));
   }
@@ -59,7 +61,7 @@ export default function Agenda() {
 
       <div className="toolbar" role="group" aria-label="Filtros">
         <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
-          <option value="">Todos los CESFAM</option>
+          <option value="">Todos los establecimientos</option>
           {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Estado">
@@ -97,13 +99,14 @@ export default function Agenda() {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>Fecha y hora</th><th>Paciente</th><th>Atención</th><th>CESFAM</th><th>Recordatorio</th><th>Estado</th><th>Registrar</th></tr>
+                <tr><th>Fecha y hora</th><th>Código</th><th>Paciente</th><th>Atención</th><th>CESFAM</th><th>Recordatorio</th><th>Estado</th><th>Registrar</th></tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td className="num">{fmt.datetime(r.slot_at)}</td>
-                    <td>{r.patient_name || <span className="muted">Sin nombre</span>}{r.channel === "web" && <span className="tag">simulador</span>}</td>
+                    <td className="num small">{r.code}</td>
+                    <td>{r.patient_name || <span className="muted">Sin nombre</span>}{r.channel === "web" && <span className="tag">simulador</span>}{r.ges && <span className="tag" title={`Mencionó ${r.ges}`}>GES</span>}</td>
                     <td>{r.prestacion_nombre}</td>
                     <td>{r.center_nombre}</td>
                     <td className="small">{REPLY[r.attendance_reply] || <span className="muted">—</span>}</td>
@@ -116,6 +119,34 @@ export default function Agenda() {
                         </>
                       )}
                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    
+      <div className="card section">
+        <div className="card-head">
+          <div>
+            <h3>Lista de espera y fill-the-gap</h3>
+            <p>Pacientes que esperan un cupo. Cuando alguien cancela, el sistema ofrece la hora al primero compatible (GES primero, luego antigüedad).</p>
+          </div>
+        </div>
+        {waitlist.length === 0 ? <div className="empty">Nadie en lista de espera.</div> : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>Desde</th><th>Paciente</th><th>Atención</th><th>Centro</th><th>Busca</th><th className="r">Ofertas</th></tr></thead>
+              <tbody>
+                {waitlist.map((w) => (
+                  <tr key={w.id}>
+                    <td className="num">{fmt.datetime(w.created_at)}</td>
+                    <td>{w.patient_name || <span className="muted">Sin nombre</span>}{w.priority > 0 && <span className="tag">GES</span>}</td>
+                    <td>{w.prestacion_nombre}</td>
+                    <td>{w.center_nombre}</td>
+                    <td className="small">{w.earlier ? "Una hora antes de la que tiene" : "Una hora"}</td>
+                    <td className="r">{w.offers}</td>
                   </tr>
                 ))}
               </tbody>

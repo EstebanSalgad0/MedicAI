@@ -30,7 +30,9 @@ const INTENT = {
   orientacion_sintomas: "Orientación de síntomas", guia_ruta: "Guía de ruta", farmacia: "Farmacia",
   ver_retiros: "Ver retiros", saludo: "Saludo", despedida: "Despedida", agradecer: "Agradecimiento",
   menu: "Menú", ayuda: "Ayuda", cancelar: "Cancelar", afirmar: "Sí", negar: "No", emergencia: "Emergencia",
-  nlu_fallback: "No entendido",
+  nlu_fallback: "No entendido", resultados_examenes: "Resultados de exámenes", tramites_fonasa: "Trámites FONASA",
+  salud_mental: "Salud mental", modo_cuidador: "Modo cuidador", hablar_persona: "Hablar con persona",
+  info_hospital: "Info del hospital", visitas: "Visitas", preparacion_examenes: "Preparación de exámenes",
 };
 
 function rangeLabel(days) {
@@ -94,7 +96,7 @@ export default function Resumen() {
           ))}
         </div>
         <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
-          <option value="">Todos los CESFAM</option>
+          <option value="">Todos los establecimientos</option>
           {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <div className="seg" role="group" aria-label="Canal">

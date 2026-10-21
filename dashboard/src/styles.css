@@ -277,3 +277,52 @@ td.num { white-space: nowrap; }
 .stars .off { color: var(--grid); }
 .link { font-size: 13px; color: var(--brand); text-decoration: none; white-space: nowrap; margin-left: auto; }
 .link:hover { text-decoration: underline; }
+
+/* ---------- tablero hospital ---------- */
+.tbars { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.tbars li { display: grid; grid-template-columns: minmax(110px, 150px) 1fr 58px 52px; gap: 10px; align-items: center; font-size: 14px; }
+.tbars-track { position: relative; height: 10px; border-radius: 5px; background: var(--surface-2); }
+.tbars-fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--good); }
+.tbars-fill.warn { background: var(--warning); }
+.tbars-fill.crit { background: var(--critical); }
+.tbars-mark { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink-2); opacity: .5; }
+.tbars-value { text-align: right; font-weight: 600; }
+.alerts { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.alert { border-left: 4px solid var(--axis); padding: 14px 16px; }
+.alert p { margin: 6px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.alert-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.alert-tag { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.alert-critical { border-left-color: var(--critical); }
+.alert-warning { border-left-color: var(--warning); }
+.alert-good { border-left-color: var(--good); }
+.ask { display: flex; gap: 8px; }
+.ask input { flex: 1; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { border: 1px solid var(--border); background: var(--surface-2); border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+.chip:hover { background: var(--brand-soft); color: var(--ink); }
+.answer { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--brand-soft); }
+.rich-line { margin: 0 0 4px; min-height: 0.6em; }
+
+/* ---------- bandeja de contacto ---------- */
+.inbox { grid-template-columns: minmax(260px, 340px) 1fr; align-items: start; }
+.inbox-list { padding: 6px; display: grid; gap: 4px; max-height: 70vh; overflow-y: auto; }
+.inbox-item { all: unset; display: grid; gap: 4px; padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+.inbox-item:hover { background: var(--surface-2); }
+.inbox-item.active { background: var(--brand-soft); }
+.inbox-item:focus-visible { outline: 2px solid var(--brand); }
+.inbox-top { display: flex; justify-content: space-between; gap: 8px; }
+.inbox-sum { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox .tag:first-child { margin-left: 0; }
+.ticket-summary { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.transcript { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; background: var(--surface-2); border-radius: 12px; padding: 10px; }
+.tline { max-width: 85%; padding: 6px 10px; border-radius: 10px; font-size: 13.5px; background: var(--surface); }
+.tline.me { align-self: flex-end; background: #d9fdd3; color: #0b0b0b; }
+.tline.agent { background: var(--brand-soft); margin-bottom: 6px; max-width: 100%; }
+.reply { display: grid; gap: 8px; margin-top: 16px; }
+.reply textarea { font: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; resize: vertical; }
+@media (max-width: 900px) {
+  .inbox { grid-template-columns: 1fr; }
+  .tbars li { grid-template-columns: 1fr 52px; }
+  .tbars-track { grid-column: 1 / -1; grid-row: 2; }
+  .tbars-detail { display: none; }
+}

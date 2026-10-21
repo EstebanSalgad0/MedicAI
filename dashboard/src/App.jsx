@@ -5,8 +5,12 @@ import Agenda from "./pages/Agenda.jsx";
 import Farmacia from "./pages/Farmacia.jsx";
 import Simulador from "./pages/Simulador.jsx";
 import Satisfaccion from "./pages/Satisfaccion.jsx";
+import Hospital from "./pages/Hospital.jsx";
+import Contacto from "./pages/Contacto.jsx";
 
 const ICONS = {
+  hospital: "M3 21h18M5 21V8l7-5 7 5v13M10 21v-5h4v5M12 8v5M9.5 10.5h5",
+  contacto: "M3 13h5l2 3h4l2-3h5M5.5 5h13L21 13v6H3v-6z",
   resumen: "M4 19V10M10 19V5M16 19v-6M22 19H2",
   satisfaccion: "m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9Z",
   agenda: "M7 3v3M17 3v3M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z",
@@ -14,10 +18,12 @@ const ICONS = {
   simulador: "M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z",
 };
 const PAGES = [
+  { id: "hospital", label: "Hospital", el: Hospital },
   { id: "resumen", label: "Indicadores", el: Resumen },
   { id: "satisfaccion", label: "Satisfacción", el: Satisfaccion },
   { id: "agenda", label: "Agenda", el: Agenda },
   { id: "farmacia", label: "Farmacia", el: Farmacia },
+  { id: "contacto", label: "Contacto", el: Contacto },
   { id: "simulador", label: "Simulador", el: Simulador },
 ];
 

@@ -56,3 +56,17 @@ def test_login_y_verify():
     tok = client.post("/auth/login", json={"username": "ana", "password": "clave-segura"}).json()["token"]
     assert client.get("/auth/verify", headers={"Authorization": f"Bearer {tok}"}).json()["user"] == "ana"
     assert client.get("/auth/verify").status_code == 401
+
+
+def test_panel_hospital_y_analitica_conversacional():
+    h = client.get("/hospital").json()
+    assert h["simulado"] and len(h["camas"]) == 8 and 0 < h["ocupacion_global"] < 1
+    assert len(h["urgencias"]["llegadas"]) == 24 and isinstance(h["alertas"], list)
+    for q, palabra in (("¿cuántas camas UCI quedan?", "UCI"), ("¿cómo va urgencias?", "espera"),
+                       ("¿cómo van las listas de espera?", "lista de espera"), ("¿y los pabellones?", "pabellones"),
+                       ("¿cómo va el chatbot?", "Auto-resolución"), ("¿cómo va el ausentismo?", "Ausentismo"),
+                       ("dame un resumen", "Resumen")):
+        r = client.post("/ask", json={"question": q}).json()
+        assert palabra.lower() in r["answer"].lower(), (q, r)
+    panel = client.get("/chatbot/panel").json()
+    assert "temas" in panel and "desvio_aps" in panel

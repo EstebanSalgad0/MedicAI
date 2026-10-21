@@ -195,3 +195,34 @@ def satisfaction(events: Iterable[Event], limit: int = 50) -> dict[str, Any]:
                     "user": e.user_hash} for e in sorted(resp, key=lambda x: x.ts, reverse=True)[:limit]],
     })
     return out
+
+
+def chatbot_panel(events: Iterable[Event], days: int = 14) -> dict[str, Any]:
+    """Panel «chatbot» del tablero de gestión: auto-resolución, temas, satisfacción,
+    desvío de baja complejidad a APS y oportunidad de los avisos de resultados."""
+    ev = list(events)
+    k = summary(ev)
+    text_intents = Counter(e.props.get("intent") for e in ev if e.type == "interaction"
+                           and e.props.get("input") == "text" and e.props.get("intent")
+                           and e.props.get("intent") not in ("saludo", "despedida", "agradecer", "afirmar", "negar"))
+    total = sum(text_intents.values())
+    temas = [{"intent": i, "n": n, "pct": round(n / total, 4)} for i, n in text_intents.most_common(8)]
+    desvio: dict[str, int] = defaultdict(int)
+    for e in ev:
+        if e.type == "triage_completed" and e.props.get("nivel") in ("control", "autocuidado"):
+            desvio[local_day(e.ts)] += 1
+    delays = [e.props.get("delay_s") for e in ev if e.type == "result_notified" and e.props.get("delay_s") is not None]
+    return {
+        "auto_resolution": k["autonomous_resolution_rate"],
+        "satisfaction": k["satisfaction_avg"],
+        "temas": temas,
+        "desvio_aps": [{"date": d, "n": n} for d, n in sorted(desvio.items())],
+        "desvio_aps_total": sum(desvio.values()),
+        "results_notified": len(delays),
+        "results_within_5_min": round(sum(1 for d in delays if d <= 300) / len(delays), 4) if delays else None,
+        "handoffs": sum(1 for e in ev if e.type == "handoff_requested"),
+        "gap_filled": sum(1 for e in ev if e.type == "gap_filled"),
+        "caregiver_sessions": sum(1 for e in ev if e.type == "caregiver_acting"),
+        "interactions": k["interactions"],
+        "unique_users": k["unique_users"],
+    }

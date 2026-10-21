@@ -32,7 +32,7 @@ export function Legend({ items, box }) {
 }
 
 /** Serie temporal: una o más líneas sobre el mismo eje (nunca doble eje). */
-export function TimeLines({ data, series, format = fmt.int, target, height = 220, domain }) {
+export function TimeLines({ data, series, format = fmt.int, target, height = 220, domain, xKey = "date", xFormat = fmt.date }) {
   if (!data?.length) return <div className="empty">Sin datos en el período.</div>;
   return (
     <>
@@ -40,14 +40,14 @@ export function TimeLines({ data, series, format = fmt.int, target, height = 220
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid stroke="var(--grid)" vertical={false} />
-          <XAxis dataKey="date" {...axis} tickFormatter={fmt.date} minTickGap={24} />
+          <XAxis dataKey={xKey} {...axis} tickFormatter={xFormat} minTickGap={24} />
           <YAxis {...axis} axisLine={false} width={format === fmt.ms ? 64 : 48} tickFormatter={format} allowDecimals={false}
             domain={domain || [0, "auto"]} />
           {target && (
             <ReferenceLine y={target.value} stroke="var(--critical)" strokeWidth={1}
               label={{ value: target.label, position: "insideTopRight", fill: "var(--ink-2)", fontSize: 12 }} />
           )}
-          <Tooltip content={<TT format={format} labelFormat={fmt.date} />} cursor={{ stroke: "var(--axis)" }} />
+          <Tooltip content={<TT format={format} labelFormat={xFormat} />} cursor={{ stroke: "var(--axis)" }} />
           {series.map((s) => (
             <Line key={s.key} dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={2} dot={false}
               activeDot={{ r: 5, stroke: "var(--surface)", strokeWidth: 2 }} connectNulls isAnimationActive={false} />
@@ -139,5 +139,28 @@ export function InlineBar({ value, tone }) {
     <span className="ibar" aria-hidden="true">
       <span className={tone ? `tone-${tone}` : ""} style={{ width: `${Math.max(0, Math.min(1, value || 0)) * 100}%` }} />
     </span>
+  );
+}
+
+/** Ocupación con umbrales: barra por fila, marcas en los umbrales y estado con texto (no solo color). */
+export function ThresholdBars({ rows, warn = 0.8, crit = 0.9 }) {
+  return (
+    <ul className="tbars">
+      {rows.map((r) => {
+        const tone = r.value >= crit ? "crit" : r.value >= warn ? "warn" : "ok";
+        return (
+          <li key={r.label}>
+            <span className="tbars-label">{r.label}</span>
+            <span className="tbars-track" aria-hidden="true">
+              <span className={`tbars-fill ${tone}`} style={{ width: `${Math.min(1, r.value) * 100}%` }} />
+              <span className="tbars-mark" style={{ left: `${warn * 100}%` }} />
+              <span className="tbars-mark" style={{ left: `${crit * 100}%` }} />
+            </span>
+            <span className="tbars-value num">{fmt.pct(r.value)}</span>
+            <span className="tbars-detail muted small">{r.detail}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

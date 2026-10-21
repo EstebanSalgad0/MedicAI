@@ -11,6 +11,7 @@ import os
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
+import httpx
 import jwt
 from fastapi import Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -20,7 +21,7 @@ from sqlalchemy import select
 from medicai_common.service import create_service, require_internal, setup_logging
 from medicai_common.textutil import TZ
 
-from . import kpis
+from . import ask, hospital, kpis
 from .models import Event, SessionLocal, init_db
 
 SERVICE = "analytics"
@@ -153,6 +154,49 @@ def get_intents(f: Filters = Depends()):
 @app.get("/satisfaction", tags=["dashboard"])
 def get_satisfaction(f: Filters = Depends(), limit: int = Query(50, ge=1, le=500)):
     return kpis.satisfaction(load(*f.args), limit)
+
+
+AGENDAMIENTO_URL = os.getenv("AGENDAMIENTO_URL", "http://ms-agendamiento:8000")
+
+
+def _agenda() -> tuple[list[dict] | None, dict | None]:
+    """Inasistencia por día y de hoy desde el microservicio de agendamiento (tolerante a fallas)."""
+    try:
+        daily = httpx.get(f"{AGENDAMIENTO_URL}/stats/daily", params={"days": 28}, timeout=4).json()
+        today = httpx.get(f"{AGENDAMIENTO_URL}/stats", timeout=4).json().get("today")
+        return daily, today
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Agendamiento no disponible para el panel: %s", exc)
+        return None, None
+
+
+@app.get("/hospital", tags=["gestión"])
+def get_hospital():
+    """Panel de gestión del hospital: operación (simulada en el prototipo), agenda y alertas."""
+    now = datetime.now(TZ).replace(tzinfo=None)
+    snap = hospital.snapshot(now)
+    daily, today = _agenda()
+    gap_today = (daily or [{}])[-1].get("gap_filled", 0) if daily else 0
+    return {**snap, "agenda": {"daily": (daily or [])[-14:], "today": today},
+            "alertas": hospital.alerts(snap, (daily or [])[-14:], gap_today)}
+
+
+@app.get("/chatbot/panel", tags=["gestión"])
+def get_chatbot_panel(days: int = Query(14, ge=1, le=365)):
+    return kpis.chatbot_panel(load(days, None, None, None, None), days)
+
+
+class AskIn(BaseModel):
+    question: str = Field(min_length=1, max_length=300)
+
+
+@app.post("/ask", tags=["gestión"])
+def post_ask(body: AskIn):
+    """Analítica conversacional: pregunta en lenguaje natural → respuesta con datos agregados."""
+    now = datetime.now(TZ).replace(tzinfo=None)
+    daily, today = _agenda()
+    bot = kpis.chatbot_panel(load(14, None, None, None, None), 14)
+    return ask.answer(body.question, hospital.snapshot(now), daily, today, bot)
 
 
 @app.get("/events", tags=["dashboard"])

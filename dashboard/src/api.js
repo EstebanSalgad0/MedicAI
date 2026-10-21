@@ -70,4 +70,6 @@ export const SERVICE_LABEL = {
   derivacion: "Derivación",
   medicamentos: "Medicamentos",
   orchestrator: "Orquestador",
+  resultados: "Resultados",
+  atencion: "Atención al usuario",
 };
