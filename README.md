@@ -20,6 +20,9 @@ Detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) y relación con la postu
 
 ## Puesta en marcha
 
+> Guía paso a paso para levantar todo en Windows con WhatsApp de Meta y ngrok:
+> [docs/PUESTA_EN_MARCHA.md](docs/PUESTA_EN_MARCHA.md).
+
 Requisitos: Docker 24+ con Docker Compose v2.
 
 ```bash
