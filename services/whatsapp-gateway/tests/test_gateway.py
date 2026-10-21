@@ -80,6 +80,8 @@ def test_proveedor_360dialog(monkeypatch):
 
 
 def test_secreto_compartido_del_webhook(monkeypatch):
+    from app.providers import Provider
+    monkeypatch.setattr(main, "PROVIDER", Provider("360dialog", "https://x/messages", {}, True))
     monkeypatch.setattr(main, "WEBHOOK_SECRET", "s3cr3t")
     monkeypatch.setattr(main, "APP_SECRET", "")
     body = {"messages": [{"id": "wamid.flat", "from": "569", "type": "text", "text": {"body": "hola"}}],
@@ -89,3 +91,10 @@ def test_secreto_compartido_del_webhook(monkeypatch):
     with patch.object(main, "handle_inbound", lambda item, t: calls.append(item)):
         r = client.post("/webhook", json=body, headers={"X-MedicAI-Webhook-Secret": "s3cr3t"})
     assert r.status_code == 200 and calls[0]["text"] == "hola" and calls[0]["name"] == "Luis"
+
+
+def test_secreto_360dialog_no_afecta_a_meta(monkeypatch):
+    monkeypatch.setattr(main, "WEBHOOK_SECRET", "s3cr3t")
+    monkeypatch.setattr(main, "APP_SECRET", "")
+    with patch.object(main, "handle_inbound", lambda item, t: None):
+        assert client.post("/webhook", json=WEBHOOK).status_code == 200

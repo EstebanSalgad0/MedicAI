@@ -137,7 +137,8 @@ def handle_inbound(item: dict, received_at: float) -> None:
 @app.post("/webhook", tags=["whatsapp"])
 async def receive(request: Request, background: BackgroundTasks):
     raw = await request.body()
-    if WEBHOOK_SECRET and not hmac.compare_digest(request.headers.get(WEBHOOK_SECRET_HEADER, ""), WEBHOOK_SECRET):
+    if (WEBHOOK_SECRET and PROVIDER.name == "360dialog"
+            and not hmac.compare_digest(request.headers.get(WEBHOOK_SECRET_HEADER, ""), WEBHOOK_SECRET)):
         raise HTTPException(401, "Secreto de webhook inválido")
     if APP_SECRET and PROVIDER.name == "meta":
         sig = request.headers.get("X-Hub-Signature-256", "")
