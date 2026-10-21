@@ -108,3 +108,10 @@ def test_acuse_de_recibo_reacciona_solo_a_texto():
     assert sent[0]["status"] == "read" and sent[0]["typing_indicator"] == {"type": "text"}
     assert sent[1]["type"] == "reaction" and sent[1]["reaction"] == {"message_id": "wamid.1", "emoji": "👀"}
     assert len(sent) == 3  # el botón solo se marca como leído, sin reacción
+
+
+def test_aviso_en_modo_cuidador_llega_al_cuidador():
+    sent = []
+    with patch.object(main, "outbox_push", lambda to, msgs: sent.append((to, msgs))):
+        main.deliver("cui:web:abc123:12345678-5", [Message(text="Recordatorio de hora")])
+    assert sent[0][0] == "web:abc123" and sent[0][1][0].text.startswith("👪")

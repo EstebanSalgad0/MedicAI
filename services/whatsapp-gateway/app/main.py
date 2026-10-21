@@ -94,6 +94,10 @@ def wa_post(payload: dict, attempts: int = 3) -> bool:
 
 def deliver(to: str, messages: list[Message]) -> tuple[int, int]:
     """Envía al canal que corresponde. Devuelve (enviados, fallidos)."""
+    if to.startswith("cui:"):
+        # Modo cuidador (cui:<cuidador>:<RUN del paciente>): el aviso le llega al cuidador
+        to = to[4:].rsplit(":", 1)[0]
+        messages = [m.model_copy(update={"text": "👪 _Modo cuidador_\n" + m.text}) for m in messages]
     if to.startswith("web:"):
         outbox_push(to, messages)
         return len(messages), 0

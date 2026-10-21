@@ -94,3 +94,49 @@ def test_boton_antiguo_no_es_error_tecnico():
         r = main.process(msg(option_id="agd:confirm:yes"))
     assert "ya no está vigente" in r.messages[0].text
     assert r.messages[0].options[0].id == "sys:menu"
+
+
+def test_menu_de_la_especificacion():
+    r = main.process(msg(text="", option_id="sys:menu"))
+    ids = [o.id for o in r.messages[0].options]
+    assert ids[:9] == ["agd:start", "ori:start", "agd:mine", "res:start", "ate:fonasa", "rec:start", "ori:animo",
+                       "ate:cui", "ate:humano"] and ids[9] == "sys:more"
+    assert all(len(o.title) <= 24 for o in r.messages[0].options)
+
+
+def test_fallback_en_tres_niveles():
+    nlu = lambda t: {"intent": "nlu_fallback", "confidence": 0, "entities": {}, "source": "fallback", "latency_ms": 1}
+    with patch.object(main, "nlu_parse", nlu):
+        r1 = main.process(msg(text="asdf"))
+        r2 = main.process(msg(text="qwer"))
+        r3 = main.process(msg(text="zxcv"))
+    assert "No logré entenderte" in r1.messages[0].text
+    assert r2.messages[0].text == "Puedo ayudarte con esto:" and r2.messages[1].type == "list"
+    assert r3.messages[0].options[0].id == "ate:humano" and r3.meta["human_handoff_offered"]
+
+
+def test_modo_cuidador_tramita_a_nombre_del_paciente():
+    calls = []
+
+    def svc(service, req):
+        calls.append((service, req.user_id, req.name))
+        if service == "atencion":
+            return DialogResponse(messages=[text("ok")], state=None, resolved=True,
+                                  acting={"id": "cui:u1:11111111-1", "name": "Juan"})
+        return DialogResponse(messages=[text("hora")], state=None, resolved=True)
+    with patch.object(main, "call_service", svc):
+        main.process(msg(option_id="ate:cui:act:1"))
+        main.process(msg(option_id="agd:start"))
+        r = main.process(msg(option_id="sys:menu"))
+    assert calls[1] == ("agendamiento", "cui:u1:11111111-1", "Juan")
+    assert "Juan" in r.messages[0].text and r.messages[0].options[7].id == "ate:cui:exit"
+    sessions.store.delete("acting:u1")
+
+
+def test_modo_gestion_responde_con_indicadores():
+    with patch.object(main, "ask_analytics", lambda q: f"📉 Respuesta a: {q}"):
+        r = main.process(main.InboundMessage(user_id="web:staff", channel="web", text="¿cómo va el ausentismo?"))
+        assert "ausentismo" in r.messages[0].text and r.meta.get("gestion")
+        r = main.process(main.InboundMessage(user_id="569999", text="¿cómo va el ausentismo?",
+                                             option_id="sys:ask:camas"))
+    assert "Respuesta" not in r.messages[0].text  # un paciente no accede al modo gestión

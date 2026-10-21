@@ -40,17 +40,33 @@ SERVICES = {
     "orientacion": os.getenv("ORIENTACION_URL", "http://ms-orientacion:8000"),
     "derivacion": os.getenv("DERIVACION_URL", "http://ms-derivacion:8000"),
     "medicamentos": os.getenv("MEDICAMENTOS_URL", "http://ms-medicamentos:8000"),
+    "resultados": os.getenv("RESULTADOS_URL", "http://ms-resultados:8000"),
+    "atencion": os.getenv("ATENCION_URL", "http://ms-atencion:8000"),
 }
 PREFIX = {"agd": "agendamiento", "rec": "recordatorios", "ori": "orientacion", "der": "derivacion",
-          "med": "medicamentos"}
+          "med": "medicamentos", "res": "resultados", "ate": "atencion"}
 INTENT_SERVICE = {
     "agendar_cita": "agendamiento", "ver_citas": "agendamiento", "cancelar_cita": "agendamiento",
     "recordatorio_medicamento": "recordatorios", "ver_recordatorios": "recordatorios",
-    "orientacion_sintomas": "orientacion", "guia_ruta": "derivacion",
+    "orientacion_sintomas": "orientacion", "salud_mental": "orientacion", "guia_ruta": "derivacion",
     "farmacia": "medicamentos", "ver_retiros": "medicamentos",
+    "resultados_examenes": "resultados",
+    "tramites_fonasa": "atencion", "modo_cuidador": "atencion", "hablar_persona": "atencion",
+    "info_hospital": "atencion", "visitas": "atencion", "preparacion_examenes": "atencion",
 }
 START_INTENT = {"agendamiento": "agendar_cita", "recordatorios": "recordatorio_medicamento",
-                "orientacion": "orientacion_sintomas", "derivacion": "guia_ruta", "medicamentos": "farmacia"}
+                "orientacion": "orientacion_sintomas", "derivacion": "guia_ruta", "medicamentos": "farmacia",
+                "resultados": "resultados_examenes", "atencion": "hablar_persona"}
+# En modo cuidador estos trámites se hacen a nombre del paciente a cargo.
+ACTING_SERVICES = {"agendamiento", "recordatorios", "resultados", "medicamentos"}
+ANALYTICS_URL = os.getenv("ANALYTICS_URL", "http://analytics:8000")
+# Modo gestión: números autorizados (separados por coma). El simulador del dashboard lo
+# usan funcionarios con sesión iniciada, así que también puede consultarlo.
+GESTION_USERS = {u.strip() for u in os.getenv("GESTION_USERS", "").split(",") if u.strip()}
+GESTION_SIMULADOR = os.getenv("GESTION_SIMULADOR", "true").lower() == "true"
+GESTION_WORDS = ("ausentismo", "inasistencia", "cama", "uci", "urgencia", "pabellon", "quirofano",
+                 "lista de espera", "listas de espera", "auto-resolucion", "autoresolucion", "chatbot",
+                 "ocupacion", "fill-the-gap", "horas recuperadas", "satisfaccion", "indicador")
 INTERRUPTS = {"cancelar", "salir", "menu", "menu principal", "volver", "inicio", "hola", "ayuda", "olvidalo"}
 
 
@@ -94,6 +110,38 @@ def call_service(service: str, req: DialogRequest) -> DialogResponse:
     return DialogResponse(**r.json())
 
 
+def is_gestion(uid: str) -> bool:
+    return uid in GESTION_USERS or (GESTION_SIMULADOR and uid.startswith("web:"))
+
+
+def ask_analytics(question: str) -> str:
+    try:
+        r = http.post(f"{ANALYTICS_URL}/ask", json={"question": question}, timeout=8)
+        r.raise_for_status()
+        return r.json()["answer"]
+    except Exception as exc:  # noqa: BLE001
+        log.error("Analítica no disponible: %s", exc)
+        return "😕 No pude consultar los indicadores en este momento. Inténtalo en unos minutos."
+
+
+def get_acting(uid: str) -> dict | None:
+    raw = sessions.store.get(f"acting:{uid}")
+    return json.loads(raw) if raw else None
+
+
+# Últimas líneas de la conversación: se entregan como contexto al derivar a una persona.
+TRANSCRIPT_LINES = 16
+
+
+def transcript(uid: str) -> list[str]:
+    return json.loads(sessions.store.get(f"transcript:{uid}") or "[]")
+
+
+def remember_lines(uid: str, lines: list[str]) -> None:
+    if lines:
+        sessions.store.set(f"transcript:{uid}", json.dumps((transcript(uid) + lines)[-TRANSCRIPT_LINES:]), 86400)
+
+
 def process(msg: InboundMessage) -> OutboundReply:
     t0 = time.perf_counter()
     uid = msg.user_id
@@ -116,6 +164,14 @@ def process(msg: InboundMessage) -> OutboundReply:
         abandon(reason)
         sessions.clear(uid)
 
+    acting = get_acting(uid)
+    gestion = is_gestion(uid)
+    tapped = json.loads(sessions.store.get(f"lastopts:{uid}") or "{}").get(msg.option_id or "", msg.option_id)
+    remember_lines(uid, [f"Paciente: {msg.text or tapped or '(adjunto)'}"[:160]])
+
+    def menu(greet: bool = False):
+        return system.menu(msg.name, greet=greet, acting=acting, gestion=gestion)
+
     try:
         flag = None if msg.option_id else red_flag(msg.text)
         if msg.media and not msg.text and not msg.option_id:
@@ -126,9 +182,10 @@ def process(msg: InboundMessage) -> OutboundReply:
             nlu = {"intent": "emergencia", "confidence": 1.0, "source": "safety", "latency_ms": 0}
             end_session("red_flag")
         elif msg.option_id and msg.option_id.startswith("sys:"):
-            action = msg.option_id.split(":")[1]
+            parts = msg.option_id.split(":")
+            action = parts[1]
             if action == "survey":
-                rating = int(msg.option_id.split(":")[2])
+                rating = int(parts[2])
                 meta["survey_rating"] = rating
                 # qué trámite se está evaluando (lo guardó el turno que envió la encuesta)
                 ctx = json.loads(sessions.store.get(f"survey_ctx:{uid}") or "{}")
@@ -137,9 +194,22 @@ def process(msg: InboundMessage) -> OutboundReply:
                 out.append(system.survey_thanks())
             elif action == "help":
                 out.append(system.help_text())
+            elif action == "more":
+                out.append(system.more_menu(gestion))
+            elif action == "gestion" and gestion:
+                end_session()
+                out.append(system.gestion_menu())
+            elif action == "ask" and gestion:
+                out.append(system.gestion_answer(ask_analytics(parts[2] if len(parts) > 2 else "")))
+                meta["gestion"] = True
             else:
                 end_session()
-                out.append(system.menu(msg.name))
+                out.append(menu())
+        elif (gestion and not session.get("service") and msg.text
+              and any(w in normalize(msg.text) for w in GESTION_WORDS)):
+            # Analítica conversacional: "¿cómo va el ausentismo?" (solo indicadores agregados)
+            out.append(system.gestion_answer(ask_analytics(msg.text)))
+            meta["gestion"] = True
         else:
             start = False
             req_intent, entities = None, {}
@@ -160,7 +230,7 @@ def process(msg: InboundMessage) -> OutboundReply:
                 else:
                     end_session(intent)
                     if intent == "saludo" or intent == "menu":
-                        out.append(system.menu(msg.name, greet=intent == "saludo"))
+                        out.append(menu(greet=intent == "saludo"))
                     elif intent == "ayuda":
                         out.append(system.help_text())
                     elif intent == "agradecer":
@@ -171,18 +241,28 @@ def process(msg: InboundMessage) -> OutboundReply:
                         out.append(system.cancelled())
                     else:
                         n = sessions.store.incr(f"fallbacks:{uid}", 600)
-                        out.extend(system.fallback(n))
+                        out.extend(system.fallback(n, menu()))
                         meta["fallback"] = True
-                        meta["human_handoff_offered"] = n >= 2
+                        meta["human_handoff_offered"] = n >= 3
 
             hops = 0
             while service and hops < 2:  # hops > 0 = un servicio pidió continuar en otro (handoff)
                 hops += 1
                 same = session.get("service") == service and not start
+                as_patient = acting if acting and service in ACTING_SERVICES else None
+                if service == "atencion":  # contexto para derivar a una persona sin repetir todo
+                    entities = {**entities, "transcript": transcript(uid), "acting": acting or {}}
                 resp = call_service(service, DialogRequest(
-                    user_id=uid, channel=msg.channel, name=msg.name, text=msg.text,
+                    user_id=as_patient["id"] if as_patient else uid, channel=msg.channel,
+                    name=as_patient["name"] if as_patient else msg.name, text=msg.text,
                     option_id=msg.option_id if hops == 1 else None, intent=req_intent,
                     entities=entities, state=session.get("state", {}) if same else {}, start=start))
+                if resp.acting is not None:  # el servicio de atención activó o cerró el modo cuidador
+                    if resp.acting:
+                        sessions.store.set(f"acting:{uid}", json.dumps(resp.acting), 4 * 3600)
+                    else:
+                        sessions.store.delete(f"acting:{uid}")
+                    acting = resp.acting or None
                 if not same:
                     abandon("switched")  # el trámite anterior quedó sin completar
                     flows.append(("flow_started", service, {"via": "handoff" if hops > 1 else
@@ -230,6 +310,9 @@ def process(msg: InboundMessage) -> OutboundReply:
         out = [system.stale_option()] if stale else [text_msg("⚠️ Tuve un problema técnico procesando tu mensaje. Inténtalo de nuevo en unos minutos. "
                         "Si es urgente llama al 131.")]
 
+    remember_lines(uid, [f"MedicAI: {m.text.splitlines()[0].replace('*', '') if m.text else ''}"[:160] for m in out])
+    # el texto de cada botón, para que el resumen muestre «🔁 Reprogramar mi hora» y no un identificador
+    sessions.store.set(f"lastopts:{uid}", json.dumps({o.id: o.title for m in out for o in m.options}), 86400)
     latency = round((time.perf_counter() - t0) * 1000, 1)
     meta.update(latency_ms=latency, nlu=nlu or None)
     record(msg, meta, nlu, flows, resolved, error, domain_events)
