@@ -250,6 +250,14 @@ def handle(req: DialogRequest) -> DialogResponse:
     action = parts[1] if len(parts) > 1 else ""
     arg = parts[2] if len(parts) > 2 else ""
 
+    # Botón antiguo de un trámite que ya terminó o expiró: faltan los datos de los pasos previos.
+    needs = {"center": ("prestacion",), "slot": ("prestacion", "center_id"),
+             "confirm": ("prestacion", "center_id", "slot") if arg == "yes" else ()}
+    if any(not state.get(k) for k in needs.get(action, ())):
+        return reply(text("⌛ Ese botón ya no está vigente: la reserva ya se procesó o pasó mucho tiempo.\n"
+                          "Escribe *mis horas* para ver tus reservas o *agendar hora* para pedir una nueva."),
+                     state=None)
+
     if action == "esp":
         if arg in ("page1", "page2"):
             return ask_prestacion(state, page=int(arg[-1]))

@@ -51,3 +51,8 @@ def test_reserva_completa_y_cancelacion():
 def test_mis_citas_vacio():
     r = turn({}, start=True, intent="ver_citas")
     assert "No tienes horas" in r["messages"][0]["text"]
+
+
+def test_boton_confirmar_antiguo_no_falla():
+    r = turn({}, option_id="agd:confirm:yes")  # trámite ya cerrado: llega sin estado
+    assert "ya no está vigente" in r["messages"][0]["text"] and r["state"] is None

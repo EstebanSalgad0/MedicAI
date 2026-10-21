@@ -62,3 +62,35 @@ def test_cancelar_interrumpe():
         r = main.process(msg(text="cancelar"))
     assert "dejé ese trámite" in r.messages[0].text and not sessions.load("u1")
     assert any(t == "flow_abandoned" for t, _ in emitted)
+
+
+def test_boton_menu_al_terminar_tramite():
+    with patch.object(main, "call_service", fake_service), \
+         patch.object(main, "nlu_parse", lambda t: {"intent": "recordatorio_medicamento", "confidence": .9,
+                                                   "entities": {}, "source": "rasa", "latency_ms": 1}):
+        r1 = main.process(msg(text="recuérdame algo"))
+        r2 = main.process(msg(text="Losartán"))
+    # en medio del trámite no se ofrece el menú; al terminar, sí
+    assert all(o.id != "sys:menu" for m in r1.messages for o in m.options)
+    assert any(o.id == "sys:menu" for o in r2.messages[-1].options)
+
+
+def test_encuesta_registra_tramite_evaluado():
+    sessions.store.delete("surveyed:u1")
+    with patch.object(main, "call_service", fake_service):
+        main.process(msg(option_id="agd:start"))
+        r = main.process(msg(option_id="agd:x"))
+        assert r.meta.get("survey_sent")
+        r = main.process(msg(option_id="sys:survey:4"))
+    survey = [kw for t, kw in emitted if t == "survey_response"]
+    assert survey and survey[0]["props"] == {"rating": 4, "flow_service": "agendamiento"}
+    assert any(o.id == "sys:menu" for o in r.messages[-1].options)
+
+
+def test_boton_antiguo_no_es_error_tecnico():
+    def falla(service, req):
+        raise RuntimeError("estado vacío")
+    with patch.object(main, "call_service", falla):
+        r = main.process(msg(option_id="agd:confirm:yes"))
+    assert "ya no está vigente" in r.messages[0].text
+    assert r.messages[0].options[0].id == "sys:menu"

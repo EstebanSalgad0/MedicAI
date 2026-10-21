@@ -10,6 +10,7 @@ qué microservicio lo atiende y registra la telemetría de la interacción:
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 import uuid
@@ -129,6 +130,10 @@ def process(msg: InboundMessage) -> OutboundReply:
             if action == "survey":
                 rating = int(msg.option_id.split(":")[2])
                 meta["survey_rating"] = rating
+                # qué trámite se está evaluando (lo guardó el turno que envió la encuesta)
+                ctx = json.loads(sessions.store.get(f"survey_ctx:{uid}") or "{}")
+                sessions.store.delete(f"survey_ctx:{uid}")
+                meta["survey_service"], meta["survey_center"] = ctx.get("service"), ctx.get("center")
                 out.append(system.survey_thanks())
             elif action == "help":
                 out.append(system.help_text())
@@ -209,13 +214,20 @@ def process(msg: InboundMessage) -> OutboundReply:
         if (SURVEY_ENABLED and completed_ok and not session.get("service")
                 and not sessions.store.get(f"surveyed:{uid}")):
             sessions.store.set(f"surveyed:{uid}", "1", SURVEY_COOLDOWN)
+            rated = next(f[1] for f in flows if f[0] == "flow_completed" and f[2]["resolved"])
+            center = next((e.center for svc, e in domain_events if svc == rated and e.center), None)
+            sessions.store.set(f"survey_ctx:{uid}", json.dumps({"service": rated, "center": center}), SURVEY_COOLDOWN)
             out.append(system.survey())
             meta["survey_sent"] = True
+        if not session.get("service") and not meta.get("red_flag"):
+            out = system.with_menu_button(out)  # trámite terminado: ofrecer volver al menú
     except Exception as exc:  # noqa: BLE001
         log.exception("Error procesando mensaje")
         error = type(exc).__name__
         sessions.clear(uid)
-        out = [text_msg("⚠️ Tuve un problema técnico procesando tu mensaje. Inténtalo de nuevo en unos minutos. "
+        # botón antiguo de otro trámite (ya cerrado): no es una falla técnica para el paciente
+        stale = bool(msg.option_id) and PREFIX.get(msg.option_id.split(":")[0]) != meta.get("active_service_before")
+        out = [system.stale_option()] if stale else [text_msg("⚠️ Tuve un problema técnico procesando tu mensaje. Inténtalo de nuevo en unos minutos. "
                         "Si es urgente llama al 131.")]
 
     latency = round((time.perf_counter() - t0) * 1000, 1)
@@ -238,7 +250,8 @@ def record(msg, meta, nlu, flows, resolved, error, domain_events) -> None:
                 })
     if meta.get("survey_rating"):
         events.emit("survey_response", service="orchestrator", user_id=msg.user_id, channel=msg.channel,
-                    props={"rating": meta["survey_rating"]})
+                    center=meta.get("survey_center"),
+                    props={"rating": meta["survey_rating"], "flow_service": meta.get("survey_service")})
     for ev_type, service, props in flows:
         events.emit(ev_type, service=service, user_id=msg.user_id, channel=msg.channel, props=props)
     for service, ev in domain_events:

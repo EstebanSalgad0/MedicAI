@@ -71,6 +71,39 @@ def survey():
                 ("sys:survey:2", "🙁 Mala"), ("sys:survey:1", "😞 Muy mala")], "Encuesta de satisfacción", "Evaluar")
 
 
+MENU_OPTION = ("sys:menu", "🏠 Menú principal")
+
+
+def with_menu_button(messages: list) -> list:
+    """Al terminar un trámite, deja a mano la opción de volver al menú principal.
+
+    - Último mensaje de texto: pasa a ser un mensaje con el botón de menú.
+    - Último mensaje con menos de 3 botones: se le suma el botón.
+    - Listas (menú, encuesta) o 3 botones: ya ofrecen opciones, no se tocan.
+    """
+    if not messages:
+        return messages
+    last = messages[-1]
+    if any(o.id.startswith("sys:menu") for o in last.options):
+        return messages
+    if last.options:
+        if last.type == "buttons" and len(last.options) < 3:
+            ids = [o.id for o in last.options] + [MENU_OPTION[0]]
+            titles = [o.title for o in last.options] + [MENU_OPTION[1]]
+            messages[-1] = buttons(last.text, list(zip(ids, titles)), last.footer)
+        return messages
+    if len(last.text) <= 1024:  # límite del cuerpo de un mensaje interactivo de WhatsApp
+        messages[-1] = buttons(last.text, [MENU_OPTION], last.footer)
+    else:
+        messages.append(buttons("¿Te ayudo con algo más?", [MENU_OPTION], FOOTER))
+    return messages
+
+
+def stale_option():
+    return buttons("⌛ Esa opción ya no está vigente: el trámite terminó o pasó mucho tiempo. "
+                   "¿Empezamos de nuevo?", [MENU_OPTION], FOOTER)
+
+
 def survey_thanks():
     return text("🙏 ¡Gracias por tu evaluación! Nos ayuda a mejorar el servicio de tu CESFAM.")
 

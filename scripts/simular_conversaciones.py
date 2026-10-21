@@ -24,11 +24,11 @@ import urllib.request
 GUIONES = {
     "agendar_hora": [
         ("texto", "hola", "MedicAI"),
-        ("texto", "quiero pedir hora con la matrona", None),
-        ("opcion", 0, None),           # primer CESFAM (o primera atención si no detectó la entidad)
-        ("opcion", 0, None),
-        ("opcion", 0, None),
+        ("texto", "quiero pedir hora con la matrona", None),  # el NLU detecta «matrona»: salta al CESFAM
+        ("opcion", 0, None),           # primer CESFAM
+        ("opcion", 0, None),           # primera hora disponible
         ("opcion", "agd:confirm:yes", "agendada"),
+        ("opcion", "agd:confirm:yes", "no está vigente"),  # botón antiguo tocado de nuevo
     ],
     "recordatorio": [
         ("texto", "recuérdame tomar el losartán", None),
