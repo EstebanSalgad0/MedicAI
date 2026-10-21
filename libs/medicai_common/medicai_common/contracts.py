@@ -47,14 +47,19 @@ class DialogResponse(BaseModel):
     resolved: bool = False  # el usuario completó su trámite sin intervención humana
     events: list[DomainEvent] = Field(default_factory=list)
     handoff: Handoff | None = None
+    # Modo cuidador: {"id": ..., "name": ...} hace que el orquestador atienda los trámites
+    # siguientes a nombre de esa persona; {} vuelve a la cuenta propia; None no cambia nada.
+    acting: dict[str, str] | None = None
 
 
 def reply(*messages: Message, state: dict | None = None, resolved: bool = False,
-          events: list[DomainEvent] | None = None, handoff: Handoff | None = None) -> DialogResponse:
+          events: list[DomainEvent] | None = None, handoff: Handoff | None = None,
+          acting: dict[str, str] | None = None) -> DialogResponse:
     return DialogResponse(
         messages=list(messages),
         state=state,
         resolved=resolved,
         events=events or [],
         handoff=handoff,
+        acting=acting,
     )

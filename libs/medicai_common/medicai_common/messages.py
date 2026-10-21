@@ -56,7 +56,4 @@ def lst(
     return Message(type="list", text=body, footer=footer, button=button, options=opts)
 
 
-DISCLAIMER = (
-    "\n\n_MedicAI entrega orientación general y no reemplaza la evaluación de un "
-    "profesional de la salud. En una emergencia llama al 131 (SAMU)._"
-)
+DISCLAIMER = "\n\n_MedicAI no entrega diagnósticos ni recetas. Ante una emergencia llama al SAMU 131._"

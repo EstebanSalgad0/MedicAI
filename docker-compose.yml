@@ -82,6 +82,18 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/medicamentos
 
+  ms-resultados:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-resultados/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/resultados
+
+  ms-atencion:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-atencion/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/atencion
+
   # Túnel HTTPS público para el webhook (pruebas sin dominio propio):
   #   docker compose --profile tunel up -d tunel && docker compose logs tunel | findstr trycloudflare
   tunel:
@@ -104,7 +116,7 @@ services:
     restart: unless-stopped
     env_file: .env
     networks: [backend]
-    depends_on: [ms-recordatorios, ms-agendamiento, ms-medicamentos, ms-derivacion]
+    depends_on: [ms-recordatorios, ms-agendamiento, ms-medicamentos, ms-derivacion, ms-resultados]
 
   postgres:
     image: postgres:16-alpine

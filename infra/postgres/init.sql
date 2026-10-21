@@ -5,3 +5,5 @@ CREATE DATABASE recordatorios;
 CREATE DATABASE derivacion;
 CREATE DATABASE medicamentos;
 CREATE DATABASE analytics;
+CREATE DATABASE resultados;
+CREATE DATABASE atencion;

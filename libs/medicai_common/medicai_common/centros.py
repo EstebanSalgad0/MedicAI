@@ -12,4 +12,8 @@ CENTROS: list[tuple[str, str, str]] = [
     ("san_juan_de_dios", "CESFAM San Juan de Dios", "Linares"),
     ("armando_williams", "CESFAM Armando Williams", "Cauquenes"),
 ]
-CENTRO_NOMBRE = {k: n for k, n, _ in CENTROS}
+# Hospital de referencia (nivel secundario). No se mezcla con CENTROS para que los
+# flujos de APS (agenda de CESFAM, guía de ruta) sigan ofreciendo solo CESFAM.
+HOSPITAL: tuple[str, str, str] = ("hrt", "Hospital Regional de Talca", "Talca")
+ESTABLECIMIENTOS = CENTROS + [HOSPITAL]
+CENTRO_NOMBRE = {k: n for k, n, _ in ESTABLECIMIENTOS}

@@ -13,7 +13,8 @@ log = logging.getLogger("scheduler")
 
 TARGETS = [u.strip() for u in os.getenv(
     "TICK_TARGETS",
-    "http://ms-recordatorios:8000,http://ms-agendamiento:8000,http://ms-medicamentos:8000,http://ms-derivacion:8000",
+    "http://ms-recordatorios:8000,http://ms-agendamiento:8000,http://ms-medicamentos:8000,http://ms-derivacion:8000,"
+    "http://ms-resultados:8000",
 ).split(",") if u.strip()]
 INTERVAL = int(os.getenv("TICK_SECONDS", "60"))
 HEADERS = {"X-Internal-Token": os.getenv("INTERNAL_TOKEN", "")}
