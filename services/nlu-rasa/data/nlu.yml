@@ -140,6 +140,16 @@ nlu:
     - necesito hora para mi hijo en [control niño sano](prestacion)
     - tomar una hora
     - quisiera agendar
+    - necesito hora con el [cardiólogo](prestacion)
+    - quiero hora en [cardiología](prestacion) en el hospital
+    - agendar hora con [traumatología](prestacion)
+    - hora con el [traumatólogo](prestacion)
+    - necesito [pediatra](prestacion) para mi hijo
+    - quiero hora con [ginecología](prestacion)
+    - hora con el [oftalmólogo](prestacion)
+    - me diagnosticaron cataratas y necesito hora con [oftalmología](prestacion)
+    - agendar en el hospital regional
+    - quiero una hora en el hospital
 
 - intent: ver_citas
   examples: |
@@ -253,6 +263,115 @@ nlu:
     - qué retiros tengo
     - fechas de retiro
 
+- intent: resultados_examenes
+  examples: |
+    - quiero ver mis resultados
+    - están listos mis exámenes
+    - resultado de mis exámenes
+    - ya salió mi examen de sangre
+    - resultado del laboratorio
+    - cuándo está mi radiografía
+    - quiero saber el resultado de la ecografía
+    - mis resultados de la tomografía
+    - resultado de la biopsia
+    - salieron los exámenes
+    - necesito mis exámenes
+    - dónde veo mis resultados
+    - el resultado del scanner
+    - ya están los resultados
+
+- intent: tramites_fonasa
+  examples: |
+    - fonasa
+    - cómo compro un bono
+    - necesito un bono fonasa
+    - certificado de afiliación
+    - qué es el ges
+    - garantías auge
+    - estado de mi licencia médica
+    - cuándo me pagan la licencia
+    - quiero pedir una devolución a fonasa
+    - trámites fonasa
+    - cuánto pago en el hospital con fonasa
+    - en qué tramo de fonasa estoy
+    - cómo saco el certificado de fonasa
+    - mi enfermedad es ges
+
+- intent: salud_mental
+  examples: |
+    - me siento muy triste
+    - tengo mucha ansiedad
+    - estoy muy estresado
+    - no puedo dormir hace días
+    - tengo insomnio
+    - me siento deprimida
+    - ando con el ánimo por el suelo
+    - lloro todo el día
+    - ya no puedo más
+    - tengo angustia
+    - necesito ayuda psicológica
+    - quiero hablar con un psicólogo
+    - me siento solo
+    - estoy con crisis de pánico
+
+- intent: modo_cuidador
+  examples: |
+    - quiero sacarle hora a mi papá
+    - modo cuidador
+    - gestionar las horas de mi mamá
+    - soy cuidador de mi madre
+    - quiero ver los resultados de mi papá
+    - administrar los recordatorios de mi abuela
+    - hacer trámites por mi familiar
+    - cuido a mi padre y quiero ayudarlo con sus horas
+    - registrarme como cuidador
+    - a nombre de mi mamá
+
+- intent: hablar_persona
+  examples: |
+    - quiero hablar con una persona
+    - hablar con un humano
+    - necesito un ejecutivo
+    - quiero poner un reclamo
+    - tengo un reclamo
+    - quiero hacer una sugerencia
+    - me pueden llamar
+    - comunicarme con alguien del hospital
+    - hablar con una persona real
+    - quiero que me atienda alguien
+    - pásame con un operador
+
+- intent: info_hospital
+  examples: |
+    - dónde queda el hospital
+    - cuál es la dirección del hospital
+    - cómo llego al hospital regional
+    - qué micro me deja en el hospital
+    - hay estacionamiento
+    - horario de admisión
+    - a qué hora abre admisión
+    - horarios del hospital
+    - cómo llegar
+
+- intent: visitas
+  examples: |
+    - horario de visitas
+    - puedo visitar a mi papá hospitalizado
+    - cuántos acompañantes pueden entrar
+    - visitas en la uci
+    - a qué hora son las visitas
+    - carnet de acompañante
+
+- intent: preparacion_examenes
+  examples: |
+    - cómo me preparo para el examen
+    - tengo que ir en ayunas
+    - cuántas horas de ayuno
+    - preparación para la ecografía
+    - preparación examen de sangre
+    - puedo tomar agua antes del examen
+    - cómo tomo la muestra de orina
+
 - synonym: odontologia
   examples: |
     - dentista
@@ -277,6 +396,32 @@ nlu:
     - kinesiología
     - kine
     - kinesiólogo
+
+- synonym: cardiologia
+  examples: |
+    - cardiología
+    - cardiólogo
+    - cardiologo
+- synonym: traumatologia
+  examples: |
+    - traumatología
+    - traumatólogo
+    - traumatologo
+- synonym: pediatria
+  examples: |
+    - pediatría
+    - pediatra
+- synonym: ginecologia
+  examples: |
+    - ginecología
+    - ginecólogo
+    - ginecologo
+- synonym: oftalmologia
+  examples: |
+    - oftalmología
+    - oftalmólogo
+    - oftalmologo
+    - oculista
 
 - lookup: medicamento
   examples: |
