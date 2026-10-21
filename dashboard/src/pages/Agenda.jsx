@@ -49,36 +49,48 @@ export default function Agenda() {
   const past = (r) => new Date(r.slot_at) < new Date();
   return (
     <>
-      <div className="page-head">
+      <header className="page-head">
         <div>
-          <h1>Agenda de horas</h1>
-          <p>Horas reservadas por pacientes a través de MedicAI. Registra la asistencia para medir la inasistencia.</p>
+          <p className="eyebrow">Agenda</p>
+          <h1>Horas reservadas por MedicAI</h1>
+          <p>Horas que los pacientes agendaron por el chat. Registra si asistieron para medir la inasistencia.</p>
         </div>
-        <div className="filters">
-          <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
-            <option value="">Todos los CESFAM</option>
-            {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Estado">
-            <option value="">Todos los estados</option>
-            {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
-          <label className="small muted">Desde <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-          <label className="small muted">Hasta <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-        </div>
+      </header>
+
+      <div className="toolbar" role="group" aria-label="Filtros">
+        <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
+          <option value="">Todos los CESFAM</option>
+          {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+        <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Estado">
+          <option value="">Todos los estados</option>
+          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <label className="small muted">Desde <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="small muted">Hasta <input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <span className="toolbar-note">{rows.length} horas en el rango</span>
       </div>
 
       {stats && (
-        <div className="grid kpis">
-          <Kpi label="Horas vigentes" value={fmt.int(stats.by_status.confirmed || 0)} />
-          <Kpi label="Asistencias registradas" value={fmt.int(stats.by_status.attended || 0)} />
-          <Kpi label="Inasistencias registradas" value={fmt.int(stats.by_status.no_show || 0)} />
-          <Kpi label="Tasa de inasistencia" value={fmt.pct(stats.no_show_rate)} detail="Sobre horas con asistencia registrada" />
+        <div className="grid stats section">
+          <Kpi icon="🗓️" label="Horas vigentes" value={fmt.int(stats.by_status.confirmed || 0)}
+            info="Horas agendadas que aún no ocurren o que no tienen asistencia registrada." />
+          <Kpi icon="✅" label="Asistencias registradas" value={fmt.int(stats.by_status.attended || 0)} />
+          <Kpi icon="🚫" label="Inasistencias registradas" value={fmt.int(stats.by_status.no_show || 0)} />
+          <Kpi icon="📉" label="Tasa de inasistencia" value={fmt.pct(stats.no_show_rate)}
+            detail="Sobre horas con asistencia registrada"
+            info="No asistió ÷ (asistió + no asistió). Solo cuenta horas en que el CESFAM registró la asistencia." />
         </div>
       )}
       {err && <div className="card error" role="alert">{err}</div>}
 
-      <div className={`card ${loading ? "loading" : ""}`}>
+      <div className={`card section ${loading ? "loading" : ""}`}>
+        <div className="card-head">
+          <div>
+            <h3>Listado de horas</h3>
+            <p>Los botones de asistencia se activan cuando la hora ya pasó.</p>
+          </div>
+        </div>
         {rows.length === 0 ? (
           <div className="empty">{loading ? "Cargando…" : "No hay horas con estos filtros."}</div>
         ) : (
@@ -91,7 +103,7 @@ export default function Agenda() {
                 {rows.map((r) => (
                   <tr key={r.id}>
                     <td className="num">{fmt.datetime(r.slot_at)}</td>
-                    <td>{r.patient_name || <span className="muted">Sin nombre</span>}{r.channel === "web" && <span className="muted small"> · simulador</span>}</td>
+                    <td>{r.patient_name || <span className="muted">Sin nombre</span>}{r.channel === "web" && <span className="tag">simulador</span>}</td>
                     <td>{r.prestacion_nombre}</td>
                     <td>{r.center_nombre}</td>
                     <td className="small">{REPLY[r.attendance_reply] || <span className="muted">—</span>}</td>

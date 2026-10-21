@@ -60,32 +60,39 @@ export default function Farmacia() {
 
   return (
     <>
-      <div className="page-head">
+      <header className="page-head">
         <div>
-          <h1>Farmacia</h1>
-          <p>Inventario que MedicAI informa a los pacientes y retiros programados.</p>
+          <p className="eyebrow">Farmacia</p>
+          <h1>Inventario y retiros</h1>
+          <p>Stock que MedicAI informa a los pacientes y retiros de medicamentos programados por el chat.</p>
         </div>
-        <div className="filters">
-          <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
-            <option value="">Todos los CESFAM</option>
-            {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-          </select>
-        </div>
+      </header>
+
+      <div className="toolbar" role="group" aria-label="Filtros">
+        <select value={center} onChange={(e) => setCenter(e.target.value)} aria-label="CESFAM">
+          <option value="">Todos los CESFAM</option>
+          {centers.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
       </div>
 
       {stats && (
-        <div className="grid kpis">
-          <Kpi label="Retiros pendientes" value={fmt.int(stats.pickups.pending || 0)} />
-          <Kpi label="Retiros cumplidos" value={fmt.pct(stats.pickup_rate)} detail={`${fmt.int(stats.pickups.done || 0)} retirados · ${fmt.int(stats.pickups.missed || 0)} no retirados`} />
-          <Kpi label="Fármacos bajo el mínimo" value={fmt.int(stats.low_stock_items)} />
-          <Kpi label="Pacientes esperando reposición" value={fmt.int(stats.pending_stock_alerts)} />
+        <div className="grid stats section">
+          <Kpi icon="📦" label="Retiros pendientes" value={fmt.int(stats.pickups.pending || 0)}
+            info="Retiros programados que aún no se registran como retirados o no retirados." />
+          <Kpi icon="✅" label="Retiros cumplidos" value={fmt.pct(stats.pickup_rate)}
+            detail={`${fmt.int(stats.pickups.done || 0)} retirados · ${fmt.int(stats.pickups.missed || 0)} no retirados`}
+            info="Retirados ÷ (retirados + no retirados). Si el paciente no responde en 7 días, el retiro se marca como no retirado." />
+          <Kpi icon="⚠️" label="Fármacos bajo el mínimo" value={fmt.int(stats.low_stock_items)}
+            info="Medicamentos cuyo stock está por debajo del mínimo definido para ese CESFAM (todos los CESFAM)." />
+          <Kpi icon="🔔" label="Pacientes esperando reposición" value={fmt.int(stats.pending_stock_alerts)}
+            info="Pacientes que pidieron aviso cuando vuelva a haber stock. Se les notifica automáticamente al actualizar el inventario." />
         </div>
       )}
-      {notice && <div className="banner" role="status">{notice}</div>}
+      {notice && <div className="banner" role="status">✓ {notice}</div>}
 
-      <div className="grid" style={{ gap: 14 }}>
+      <div className="grid section">
         <div className="card">
-          <div className="card-head"><div><h2>Inventario</h2><p>Al reponer un fármaco sin stock, MedicAI avisa automáticamente a quienes lo pidieron.</p></div></div>
+          <div className="card-head"><div><h3>Inventario</h3><p>Al reponer un fármaco sin stock, MedicAI avisa automáticamente a quienes lo pidieron.</p></div></div>
           <form className="filters" style={{ marginBottom: 10 }}
             onSubmit={async (e) => {
               e.preventDefault();
@@ -113,7 +120,7 @@ export default function Farmacia() {
         </div>
 
         <div className="card">
-          <div className="card-head"><div><h2>Próximos retiros</h2><p>Programados por pacientes en el chat</p></div></div>
+          <div className="card-head"><div><h3>Próximos retiros</h3><p>Programados por pacientes en el chat</p></div></div>
           {pickups.length ? (
             <div className="table-wrap">
               <table>
