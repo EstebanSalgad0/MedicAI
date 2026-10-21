@@ -30,8 +30,9 @@ def post_dialog(req: DialogRequest) -> DialogResponse:
     return dialog.handle(req)
 
 
-def _dose_message(log_id: int, medication: str, slot: str):
-    return buttons(f"⏰ *Hora de tu medicamento*\n\nSon las {slot}: toca tomar *{medication}*.",
+def _dose_message(log_id: int, medication: str, slot: str, dose: str | None = None):
+    dosis = f" ({dose})" if dose else ""
+    return buttons(f"⏰ *Recordatorio de medicamento*\n\nA las *{slot}* te toca tomar *{medication}*{dosis}.",
                    [(f"rec:dose:{log_id}:taken", "✅ Ya la tomé"), (f"rec:dose:{log_id}:snooze", "⏰ En 30 min"),
                     (f"rec:dose:{log_id}:skip", "❌ La omití")], "Adherencia • MedicAI")
 
@@ -47,7 +48,8 @@ def tick():
             for slot in r.time_list:
                 hh, mm = map(int, slot.split(":"))
                 slot_dt = datetime(today.year, today.month, today.day, hh, mm)
-                if not (slot_dt <= now < slot_dt + timedelta(minutes=SEND_WINDOW_MIN)):
+                notify_at = slot_dt - timedelta(minutes=dialog.LEAD)  # aviso unos minutos antes de la toma
+                if not (notify_at <= now < notify_at + timedelta(minutes=SEND_WINDOW_MIN)):
                     continue
                 exists = db.scalar(select(DoseLog.id).where(DoseLog.reminder_id == r.id,
                                                             DoseLog.scheduled_date == today, DoseLog.slot == slot))
@@ -56,7 +58,7 @@ def tick():
                 dl = DoseLog(reminder_id=r.id, user_id=r.user_id, scheduled_date=today, slot=slot, sent_at=now)
                 db.add(dl)
                 db.flush()
-                if send(r.user_id, [_dose_message(dl.id, r.medication, slot)]):
+                if send(r.user_id, [_dose_message(dl.id, r.medication, slot, r.dose)]):
                     sent += 1
                     events.emit("dose_reminder_sent", service=SERVICE, user_id=r.user_id)
                 else:
@@ -64,7 +66,7 @@ def tick():
         # 2) tomas pospuestas
         for dl in db.scalars(select(DoseLog).where(DoseLog.status == "snoozed", DoseLog.snooze_until <= now)):
             r = db.get(Reminder, dl.reminder_id)
-            if r and send(dl.user_id, [_dose_message(dl.id, r.medication, dl.slot)]):
+            if r and send(dl.user_id, [_dose_message(dl.id, r.medication, dl.slot, r.dose)]):
                 dl.status, dl.snooze_until = "sent", None
                 resent += 1
         # 3) sin respuesta
@@ -73,8 +75,22 @@ def tick():
             dl.status = "expired"
             expired += 1
             events.emit("dose_expired", service=SERVICE, user_id=dl.user_id)
+        # 4) receta por terminar: aviso 5 días antes para renovarla
+        renew = 0
+        if now.hour >= 9:
+            for r in db.scalars(select(Reminder).where(Reminder.active.is_(True), Reminder.rx_end.is_not(None),
+                                                       (Reminder.rx_notified.is_(False)) | (Reminder.rx_notified.is_(None)),
+                                                       Reminder.rx_end <= today + timedelta(days=5))):
+                msg = buttons(f"📄 *Tu receta de {r.medication} termina el {r.rx_end:%d-%m-%Y}.*\n\n"
+                              "Pide una hora de control para renovarla y no interrumpir tu tratamiento.",
+                              [("agd:start", "📅 Agendar control"), ("med:start", "💊 Farmacia")],
+                              "Recordatorios • MedicAI")
+                if send(r.user_id, [msg]):
+                    r.rx_notified = True
+                    renew += 1
+                    events.emit("rx_renewal_reminder", service=SERVICE, user_id=r.user_id)
         db.commit()
-    return {"sent": sent, "resent": resent, "expired": expired}
+    return {"sent": sent, "resent": resent, "expired": expired, "rx_renewal": renew}
 
 
 # ---------- API para el dashboard ----------

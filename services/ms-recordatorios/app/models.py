@@ -5,7 +5,7 @@ from datetime import date, datetime
 from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from medicai_common.service import Base, make_db
+from medicai_common.service import Base, ensure_columns, make_db
 
 engine, SessionLocal = make_db("recordatorios.db")
 
@@ -17,6 +17,9 @@ class Reminder(Base):
     user_id: Mapped[str] = mapped_column(String(64), index=True)
     medication: Mapped[str] = mapped_column(String(120))
     times: Mapped[str] = mapped_column(String(120))  # "08:00,20:00"
+    dose: Mapped[str | None] = mapped_column(String(60))          # "1 comprimido"
+    rx_end: Mapped[date | None] = mapped_column(Date)            # fin de la receta (aviso de renovación)
+    rx_notified: Mapped[bool] = mapped_column(Boolean, default=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     source: Mapped[str] = mapped_column(String(20), default="chat")  # chat | medicamentos | derivacion
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -46,3 +49,4 @@ class DoseLog(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    ensure_columns(engine, "reminders", {"dose": "VARCHAR(60)", "rx_end": "DATE", "rx_notified": "BOOLEAN DEFAULT FALSE"})

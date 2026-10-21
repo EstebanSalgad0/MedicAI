@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from medicai_common import events
-from medicai_common.centros import CENTRO_NOMBRE, CENTROS
+from medicai_common.centros import CENTRO_NOMBRE, ESTABLECIMIENTOS
 from medicai_common.contracts import DialogRequest, DialogResponse
 from medicai_common.messages import buttons, text
 from medicai_common.notify import send
@@ -32,12 +32,14 @@ def _startup() -> None:
     init_db()
     if os.getenv("SEED_DEMO_STOCK", "false").lower() == "true":
         with SessionLocal() as db:
-            if not db.scalar(select(func.count()).select_from(StockItem)):
-                for center_id, _, _ in CENTROS:
-                    for name, qty in DEMO_STOCK:
-                        db.add(StockItem(center_id=center_id, key=stock_provider.key(name), name=name, stock=qty))
-                db.commit()
-                log.info("Inventario de demostración cargado")
+            seeded = set(db.scalars(select(StockItem.center_id).distinct()))
+            nuevos = [c for c, _, _ in ESTABLECIMIENTOS if c not in seeded]
+            for center_id in nuevos:  # también la Farmacia Hospitalaria en instalaciones existentes
+                for name, qty in DEMO_STOCK:
+                    db.add(StockItem(center_id=center_id, key=stock_provider.key(name), name=name, stock=qty))
+            db.commit()
+            if nuevos:
+                log.info("Inventario de demostración cargado: %s", nuevos)
 
 
 app = create_service(SERVICE, "Disponibilidad de fármacos, retiros programados en farmacia del CESFAM "

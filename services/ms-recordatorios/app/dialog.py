@@ -1,18 +1,20 @@
 """Recordatorios de toma de medicamentos y registro de adherencia."""
 from __future__ import annotations
 
-from datetime import timedelta
+import os
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 
 from medicai_common.contracts import DialogRequest, DialogResponse, DomainEvent, reply
 from medicai_common.matching import choice, remember_menu
 from medicai_common.messages import buttons, lst, text
-from medicai_common.textutil import normalize, now_local, parse_times
+from medicai_common.textutil import normalize, now_local, parse_date, parse_times
 
 from .models import DoseLog, Reminder, SessionLocal
 
 FOOTER = "Recordatorios • MedicAI"
+LEAD = int(os.getenv("REMINDER_LEAD_MINUTES", "10"))  # aviso antes de cada toma
 FRECUENCIAS = [
     ("rec:freq:1", "1 vez al día"),
     ("rec:freq:2", "2 veces al día", "Cada 12 horas"),
@@ -41,6 +43,28 @@ def ask_name(state: dict) -> DialogResponse:
                  state={**state, "step": "name"})
 
 
+DOSIS = [("rec:dose_q:1 comprimido", "1 comprimido"), ("rec:dose_q:2 comprimidos", "2 comprimidos"),
+         ("rec:dose_q:skip", "Prefiero no decir")]
+RECETA = [("rec:rx:30", "30 días", "Receta de un mes"), ("rec:rx:60", "60 días"), ("rec:rx:90", "90 días"),
+          ("rec:rx:180", "6 meses", "Receta crónica semestral"), ("rec:rx:none", "No sé / no aplica")]
+DUDAS = "_Si tienes dudas sobre la dosis, consulta a tu médico o al químico farmacéutico._"
+
+
+def ask_dose(state: dict) -> DialogResponse:
+    msg = buttons(f"💊 ¿Qué *dosis* de *{state['medication']}* tomas cada vez?\n"
+                  "_Escríbela tal como te la indicaron (ej: 1/2 comprimido, 10 ml) o elige una opción._",
+                  DOSIS, FOOTER)
+    return reply(msg, state=remember_menu({**state, "step": "dose"}, msg))
+
+
+def ask_rx(state: dict) -> DialogResponse:
+    msg = lst("📄 ¿Por cuánto tiempo es tu receta, contando desde hoy?\n"
+              "Te avisaré *5 días antes* de que se termine para que la renueves.\n"
+              "_También puedes escribir la fecha de término, ej: 30-11-2026._",
+              RECETA, FOOTER, "Elegir")
+    return reply(msg, state=remember_menu({**state, "step": "rx"}, msg))
+
+
 def ask_freq(state: dict) -> DialogResponse:
     msg = lst(f"¿Cuántas veces al día tomas *{state['medication']}*?", FRECUENCIAS, FOOTER, "Ver frecuencias")
     return reply(msg, state=remember_menu({**state, "step": "freq"}, msg))
@@ -58,8 +82,12 @@ def ask_custom(state: dict) -> DialogResponse:
 
 
 def ask_confirm(state: dict) -> DialogResponse:
-    msg = buttons(f"📋 Te recordaré *{state['medication']}* a las *{', '.join(state['times'])}* todos los días.\n\n"
-                  "En cada aviso podrás marcar si ya la tomaste. ¿Lo dejo activo?",
+    dosis = f" ({state['dose']})" if state.get("dose") else ""
+    receta = (f"\n📄 Receta hasta el *{datetime.fromisoformat(state['rx_end']):%d-%m-%Y}*: te aviso 5 días antes."
+              if state.get("rx_end") else "")
+    msg = buttons(f"📋 *Revisa tu plan*\n\n💊 *{state['medication']}*{dosis}\n"
+                  f"⏰ {', '.join(state['times'])} todos los días (te aviso {LEAD} minutos antes){receta}\n\n"
+                  f"En cada aviso podrás marcar si ya la tomaste.\n{DUDAS}\n\n¿Lo dejo activo?",
                   [("rec:save:yes", "✅ Activar"), ("rec:save:no", "❌ Cancelar")], FOOTER)
     return reply(msg, state=remember_menu({**state, "step": "confirm"}, msg))
 
@@ -69,11 +97,13 @@ def save(req: DialogRequest) -> DialogResponse:
     with SessionLocal() as db:
         existing = db.scalar(select(Reminder).where(Reminder.user_id == req.user_id, Reminder.active.is_(True),
                                                     Reminder.medication == st["medication"]))
+        rx_end = date.fromisoformat(st["rx_end"][:10]) if st.get("rx_end") else None
         if existing:
             existing.times = ",".join(st["times"])
+            existing.dose, existing.rx_end, existing.rx_notified = st.get("dose"), rx_end, False
         else:
             db.add(Reminder(user_id=req.user_id, medication=st["medication"], times=",".join(st["times"]),
-                            source=st.get("source", "chat")))
+                            dose=st.get("dose"), rx_end=rx_end, source=st.get("source", "chat")))
         db.commit()
     # No se envía el nombre del medicamento a analítica (minimización de datos, Ley 21.719).
     ev = DomainEvent(type="reminder_created", props={"doses_per_day": len(st["times"]),
@@ -153,7 +183,7 @@ def handle(req: DialogRequest) -> DialogResponse:
         med = (req.entities or {}).get("medicamento")
         base = {"source": (req.entities or {}).get("source", "chat")}
         if med:
-            return ask_freq({**base, "medication": pretty(str(med))})
+            return ask_dose({**base, "medication": pretty(str(med))})
         return ask_name(base)
 
     step = state.get("step")
@@ -161,7 +191,23 @@ def handle(req: DialogRequest) -> DialogResponse:
         name = req.text.strip()
         if len(name) < 2:
             return ask_name(state)
-        return ask_freq({**state, "medication": pretty(name)})
+        return ask_dose({**state, "medication": pretty(name)})
+    if step == "dose":
+        if opt and opt.startswith("rec:dose_q:"):
+            val = opt.split(":", 2)[2]
+            return ask_freq({**state, "dose": None if val == "skip" else val})
+        if len(req.text.strip()) >= 1:
+            return ask_freq({**state, "dose": " ".join(req.text.split())[:60]})
+        return ask_dose(state)
+    if step == "rx":
+        if opt and opt.startswith("rec:rx:"):
+            val = opt.split(":")[2]
+            end = None if val == "none" else (now_local().date() + timedelta(days=int(val))).isoformat()
+            return ask_confirm({**state, "rx_end": end})
+        parsed = parse_date(req.text)
+        if parsed:
+            return ask_confirm({**state, "rx_end": parsed.isoformat()})
+        return ask_rx(state)
     if step == "freq":
         if opt == "rec:freq:custom":
             return ask_custom(state)
@@ -176,12 +222,12 @@ def handle(req: DialogRequest) -> DialogResponse:
             if not parsed:
                 return ask_first(state)
             first = parsed[0]
-        return ask_confirm({**state, "times": spread(first, state["n"])})
+        return ask_rx({**state, "times": spread(first, state["n"])})
     if step == "custom":
         times = parse_times(req.text)
         if not times:
             return reply(text("No pude leer las horas 😕. Escríbelas así: *08:00 y 20:00*"), state=state)
-        return ask_confirm({**state, "times": times})
+        return ask_rx({**state, "times": times})
     if step == "confirm":
         if opt == "rec:save:yes":
             return save(req)

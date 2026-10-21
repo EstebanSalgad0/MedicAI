@@ -5,7 +5,8 @@ from datetime import timedelta
 
 from sqlalchemy import select
 
-from medicai_common.centros import CENTRO_NOMBRE, CENTROS
+from medicai_common import hospital
+from medicai_common.centros import CENTRO_NOMBRE, CENTROS, HOSPITAL
 from medicai_common.contracts import DialogRequest, DialogResponse, DomainEvent, Handoff, reply
 from medicai_common.matching import choice, remember_menu
 from medicai_common.messages import Message, buttons, lst, text
@@ -36,15 +37,19 @@ def ask_rx() -> DialogResponse:
 
 
 def ask_center(state: dict) -> DialogResponse:
-    msg = lst(f"¿En qué CESFAM retiras *{state['medication']}*?",
-              [(f"med:center:{k}", n, comuna) for k, n, comuna in CENTROS], FOOTER, "Ver CESFAM")
+    opts = [(f"med:center:{k}", n, comuna) for k, n, comuna in CENTROS]
+    opts.append((f"med:center:{HOSPITAL[0]}", "🏥 Farmacia Hospitalaria", f"{HOSPITAL[1]} · módulo 1"))
+    msg = lst(f"¿Dónde retiras *{state['medication']}*?", opts, FOOTER, "Ver farmacias")
     return reply(msg, state=remember_menu({**state, "step": "center"}, msg))
 
 
 def availability(state: dict) -> DialogResponse:
     status, canonical = stock_provider.check(state["center_id"], state["medication"])
     state = {**state, "medication": canonical, "stock_status": status}
-    info = text(STATUS_TXT[status].format(m=canonical, c=CENTRO_NOMBRE[state["center_id"]]))
+    lugar = f"la Farmacia Hospitalaria del {HOSPITAL[1]}" if state["center_id"] == HOSPITAL[0] \
+        else CENTRO_NOMBRE[state["center_id"]]
+    detalle = f"\n📍 {hospital.FARMACIA}" if state["center_id"] == HOSPITAL[0] and status != "none" else ""
+    info = text(STATUS_TXT[status].format(m=canonical, c=lugar) + detalle)
     ev = DomainEvent(type="stock_checked", center=state["center_id"], props={"status": status})
     if status == "none":
         msg = buttons("¿Quieres que te avise cuando vuelva a haber stock?",
