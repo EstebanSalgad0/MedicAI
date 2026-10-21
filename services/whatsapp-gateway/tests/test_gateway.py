@@ -98,3 +98,13 @@ def test_secreto_360dialog_no_afecta_a_meta(monkeypatch):
     monkeypatch.setattr(main, "APP_SECRET", "")
     with patch.object(main, "handle_inbound", lambda item, t: None):
         assert client.post("/webhook", json=WEBHOOK).status_code == 200
+
+
+def test_acuse_de_recibo_reacciona_solo_a_texto():
+    sent = []
+    with patch.object(main, "wa_post", lambda p, attempts=3: sent.append(p) or True):
+        main.acknowledge({"id": "wamid.1", "from": "569", "text": "hola", "option_id": None})
+        main.acknowledge({"id": "wamid.2", "from": "569", "text": "Confirmar", "option_id": "agd:ok"})
+    assert sent[0]["status"] == "read" and sent[0]["typing_indicator"] == {"type": "text"}
+    assert sent[1]["type"] == "reaction" and sent[1]["reaction"] == {"message_id": "wamid.1", "emoji": "👀"}
+    assert len(sent) == 3  # el botón solo se marca como leído, sin reacción

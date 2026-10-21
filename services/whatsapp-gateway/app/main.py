@@ -30,6 +30,8 @@ WEBHOOK_SECRET_HEADER = "X-MedicAI-Webhook-Secret"
 PROVIDER = providers.load()
 DRY_RUN = os.getenv("WHATSAPP_DRY_RUN", "auto").lower() == "true" or not PROVIDER.configured
 ORCHESTRATOR_URL = os.getenv("ORCHESTRATOR_URL", "http://orchestrator:8000")
+# Reacción al mensaje del paciente para mostrar que el bot lo vio (vacío = sin reacción)
+REACTION_EMOJI = os.getenv("WHATSAPP_REACTION_EMOJI", "👀")
 
 if os.getenv("REDIS_URL"):
     import redis
@@ -115,10 +117,21 @@ def verify(mode: str = Query(alias="hub.mode", default=""), token: str = Query(a
     raise HTTPException(403, "Token de verificación inválido")
 
 
+def acknowledge(item: dict) -> None:
+    """Muestra al paciente que su mensaje llegó: doble check azul, «escribiendo…» y una reacción."""
+    read = {"messaging_product": "whatsapp", "status": "read", "message_id": item["id"]}
+    # el indicador de escritura dura hasta que llega la respuesta (máx. 25 s)
+    if not wa_post({**read, "typing_indicator": {"type": "text"}}, attempts=1):
+        wa_post(read, attempts=1)
+    if REACTION_EMOJI and item.get("text") and not item.get("option_id"):  # solo a mensajes escritos
+        wa_post({"messaging_product": "whatsapp", "recipient_type": "individual", "to": item["from"],
+                 "type": "reaction", "reaction": {"message_id": item["id"], "emoji": REACTION_EMOJI}}, attempts=1)
+
+
 def handle_inbound(item: dict, received_at: float) -> None:
     try:
         if not DRY_RUN:
-            wa_post({"messaging_product": "whatsapp", "status": "read", "message_id": item["id"]}, attempts=1)
+            acknowledge(item)
         r = httpx.post(f"{ORCHESTRATOR_URL}/message", timeout=20, headers={"X-Internal-Token": INTERNAL_TOKEN},
                        json={"user_id": item["from"], "channel": "whatsapp", "name": item["name"],
                              "text": item["text"], "option_id": item["option_id"], "media": item["media"]})
