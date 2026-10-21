@@ -1,0 +1,4 @@
+{
+  "_instrucciones": "Directorio de SAPU/SAR por comuna. Debe completarlo y validarlo el equipo con las entidades asociadas (Servicio de Salud del Maule / DIRCOM Talca). Mientras una comuna no tenga datos, el chatbot deriva a Salud Responde. Formato: {\"talca\": [{\"nombre\": \"...\", \"direccion\": \"...\", \"horario\": \"...\"}]}",
+  "comunas": {}
+}

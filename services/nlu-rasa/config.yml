@@ -1,0 +1,27 @@
+# Rasa NLU (solo clasificación de intenciones y extracción de entidades).
+# El manejo del diálogo lo hacen el orquestador y los microservicios, no Rasa Core.
+recipe: default.v1
+assistant_id: medicai-nlu
+language: es
+
+pipeline:
+  - name: WhitespaceTokenizer
+  - name: RegexFeaturizer
+    case_sensitive: false
+  - name: LexicalSyntacticFeaturizer
+  - name: CountVectorsFeaturizer
+  # n-gramas de caracteres: robusto a faltas de ortografía y tildes omitidas
+  - name: CountVectorsFeaturizer
+    analyzer: char_wb
+    min_ngram: 1
+    max_ngram: 4
+  - name: DIETClassifier
+    epochs: 120
+    constrain_similarities: true
+    random_seed: 42
+  - name: EntitySynonymMapper
+  - name: FallbackClassifier
+    threshold: 0.55
+    ambiguity_threshold: 0.1
+
+policies: []

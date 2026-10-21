@@ -1,0 +1,300 @@
+version: "3.1"
+
+nlu:
+- intent: saludo
+  examples: |
+    - hola
+    - holi
+    - hola buenas
+    - buenas
+    - buenos días
+    - buenos dias
+    - buenas tardes
+    - buenas noches
+    - alo
+    - hola medicai
+    - hola, necesito ayuda
+    - qué tal
+    - saludos
+    - wena
+    - holaa
+
+- intent: despedida
+  examples: |
+    - chao
+    - adiós
+    - adios
+    - hasta luego
+    - nos vemos
+    - chaito
+    - eso es todo
+    - me voy
+    - hasta pronto
+    - bye
+
+- intent: agradecer
+  examples: |
+    - gracias
+    - muchas gracias
+    - mil gracias
+    - te pasaste gracias
+    - muy amable
+    - gracias por la ayuda
+    - se agradece
+    - buenísimo gracias
+    - ok gracias
+
+- intent: menu
+  examples: |
+    - menú
+    - menu
+    - menú principal
+    - ver opciones
+    - qué puedes hacer
+    - que opciones tienes
+    - volver al inicio
+    - inicio
+    - mostrar el menú
+    - en qué me puedes ayudar
+
+- intent: ayuda
+  examples: |
+    - ayuda
+    - no entiendo cómo funciona
+    - cómo te uso
+    - comandos
+    - instrucciones
+    - no sé qué hacer
+    - cómo funciona esto
+    - necesito ayuda con el chat
+
+- intent: cancelar
+  examples: |
+    - cancelar
+    - salir
+    - olvídalo
+    - ya no quiero
+    - detente
+    - para
+    - no quiero seguir
+    - déjalo así
+    - anula esto
+
+- intent: afirmar
+  examples: |
+    - sí
+    - si
+    - claro
+    - dale
+    - ya
+    - ok
+    - bueno
+    - de acuerdo
+    - correcto
+    - exacto
+
+- intent: negar
+  examples: |
+    - no
+    - no gracias
+    - nop
+    - para nada
+    - no por ahora
+    - todavía no
+    - negativo
+
+- intent: emergencia
+  examples: |
+    - es una emergencia
+    - ayuda urgente
+    - me duele mucho el pecho y el brazo
+    - no puedo respirar
+    - mi papá se desmayó
+    - hubo un accidente
+    - necesito una ambulancia
+    - llamen al samu
+    - mi hijo está convulsionando
+    - está sangrando mucho
+    - se me durmió la mitad de la cara
+    - urgente
+
+- intent: agendar_cita
+  examples: |
+    - quiero agendar una hora
+    - agendar cita
+    - necesito una hora médica
+    - pedir hora
+    - quiero pedir hora con el doctor
+    - necesito hora pal médico
+    - quiero una cita médica
+    - reservar hora en el cesfam
+    - agendar hora con [matrona](prestacion)
+    - necesito hora con el [dentista](prestacion)
+    - quiero hora para [odontología](prestacion)
+    - pedir hora de [control crónico](prestacion)
+    - me pueden dar una hora
+    - necesito atenderme con un médico
+    - quiero sacar hora
+    - agendar control
+    - hora para [kinesiología](prestacion)
+    - necesito hora para mi hijo en [control niño sano](prestacion)
+    - tomar una hora
+    - quisiera agendar
+
+- intent: ver_citas
+  examples: |
+    - mis citas
+    - mis horas
+    - ver mis horas
+    - cuándo es mi hora
+    - qué horas tengo agendadas
+    - revisar mi cita
+    - tengo alguna hora
+    - a qué hora es mi control
+    - quiero ver mi cita
+
+- intent: cancelar_cita
+  examples: |
+    - cancelar mi hora
+    - no puedo ir a mi cita
+    - quiero anular mi hora
+    - cambiar mi hora
+    - reagendar mi cita
+    - necesito cambiar la fecha de mi hora
+    - no voy a poder ir al control
+    - anular cita
+
+- intent: recordatorio_medicamento
+  examples: |
+    - recordatorio de medicamento
+    - quiero que me recuerdes tomar mis remedios
+    - recuérdame tomar el [losartán](medicamento)
+    - necesito un recordatorio para la [metformina](medicamento)
+    - me olvido de tomar las pastillas
+    - avísame cuando tenga que tomar el remedio
+    - configurar alarma de medicamentos
+    - recordarme la [insulina](medicamento)
+    - quiero recordatorios de mis pastillas
+    - me cuesta acordarme de los remedios
+    - recordar tomar [paracetamol](medicamento) cada 8 horas
+    - alarma para el [enalapril](medicamento)
+    - crear recordatorio
+    - recordatorio pastillas
+
+- intent: ver_recordatorios
+  examples: |
+    - mis recordatorios
+    - ver recordatorios
+    - qué recordatorios tengo
+    - gestionar recordatorios
+    - borrar un recordatorio
+    - eliminar recordatorio
+    - cambiar mis recordatorios
+    - lista de recordatorios
+
+- intent: orientacion_sintomas
+  examples: |
+    - orientación de síntomas
+    - me siento mal
+    - tengo fiebre
+    - me duele la cabeza
+    - tengo tos hace tres días
+    - me duele la guata
+    - tengo dolor de muelas
+    - creo que estoy enfermo
+    - tengo diarrea
+    - me pica la piel
+    - qué hago si tengo dolor de garganta
+    - tengo síntomas
+    - estoy resfriado
+    - me siento ansioso y no duermo
+    - me duele la espalda
+    - debo ir a urgencia o al cesfam
+    - me arde al orinar
+
+- intent: guia_ruta
+  examples: |
+    - guía de ruta
+    - me dieron una interconsulta
+    - qué hago con la interconsulta
+    - me derivaron al especialista
+    - tengo una orden de exámenes
+    - derivación
+    - me mandaron a hacer exámenes
+    - qué es el ges
+    - cómo funciona la derivación
+    - me dieron una orden médica
+    - cuánto demora la interconsulta
+    - necesito hora con el cardiólogo
+    - me derivaron de urgencia
+
+- intent: farmacia
+  examples: |
+    - stock de medicamentos
+    - farmacia
+    - hay [losartán](medicamento) en el cesfam
+    - quiero saber si hay [metformina](medicamento)
+    - retirar medicamentos
+    - cuándo retiro mis remedios
+    - tienen [salbutamol](medicamento)
+    - disponibilidad de medicamentos
+    - quiero retirar mi receta
+    - programar retiro de remedios
+    - está disponible el [atorvastatina](medicamento)
+    - hay stock de [paracetamol](medicamento)
+    - retiro de fármacos
+    - me toca retirar pastillas
+
+- intent: ver_retiros
+  examples: |
+    - mis retiros
+    - ver retiros
+    - cuándo es mi próximo retiro
+    - qué retiros tengo
+    - fechas de retiro
+
+- synonym: odontologia
+  examples: |
+    - dentista
+    - odontología
+    - dental
+- synonym: matrona
+  examples: |
+    - matrona
+    - ginecología
+    - control prenatal
+- synonym: control_cronico
+  examples: |
+    - control crónico
+    - cardiovascular
+    - pscv
+- synonym: nino_sano
+  examples: |
+    - control niño sano
+    - niño sano
+- synonym: kinesiologia
+  examples: |
+    - kinesiología
+    - kine
+    - kinesiólogo
+
+- lookup: medicamento
+  examples: |
+    - losartán
+    - losartan
+    - metformina
+    - paracetamol
+    - enalapril
+    - atorvastatina
+    - salbutamol
+    - insulina
+    - levotiroxina
+    - amoxicilina
+    - omeprazol
+    - aspirina
+    - ibuprofeno
+    - hidroclorotiazida
+    - amlodipino
+    - glibenclamida
+    - sertralina
+    - fluoxetina

@@ -1,0 +1,82 @@
+# Conjunto de prueba RESERVADO (no se usa para entrenar).
+# Sirve para medir precisión del NLU con `rasa test nlu` y con scripts/evaluar_nlu.py.
+# Para validar en terreno (OE3), agregar aquí mensajes reales anonimizados de los pilotos.
+version: "3.1"
+
+nlu:
+- intent: saludo
+  examples: |
+    - hola cómo estás
+    - buenas tardes señorita
+    - hola buen día
+- intent: despedida
+  examples: |
+    - ya chao gracias por todo
+    - nos vemos luego
+    - adiós que estés bien
+- intent: agradecer
+  examples: |
+    - muchísimas gracias
+    - gracias de verdad
+    - le agradezco
+- intent: menu
+  examples: |
+    - quiero ver el menú
+    - muéstrame las opciones
+    - qué cosas haces
+- intent: cancelar
+  examples: |
+    - mejor no, cancela
+    - ya no quiero hacer eso
+    - salir de esto
+- intent: emergencia
+  examples: |
+    - mi mamá no respira bien ayuda
+    - se cayó y no despierta
+    - tengo un dolor fuerte en el pecho que baja al brazo
+- intent: agendar_cita
+  examples: |
+    - necesito pedir una hora para el doctor
+    - me puedes agendar con la matrona
+    - quiero hora en el consultorio
+    - cómo saco hora para el dentista
+- intent: ver_citas
+  examples: |
+    - qué día tengo hora
+    - recuérdame cuándo es mi cita
+    - tengo horas pendientes
+- intent: cancelar_cita
+  examples: |
+    - no podré asistir a mi hora
+    - quiero cambiar el día de mi cita
+    - necesito anular la hora del jueves
+- intent: recordatorio_medicamento
+  examples: |
+    - ayúdame a acordarme de las pastillas de la presión
+    - pon una alarma para mi metformina
+    - siempre se me olvida el remedio
+- intent: ver_recordatorios
+  examples: |
+    - qué alarmas de remedios tengo
+    - quiero borrar una alarma
+    - muéstrame mis recordatorios
+- intent: orientacion_sintomas
+  examples: |
+    - tengo mucha tos y fiebre
+    - me duele el estómago desde ayer
+    - ando con dolor de oído
+    - me salieron ronchas
+- intent: guia_ruta
+  examples: |
+    - el doctor me dio una interconsulta para el traumatólogo
+    - qué hago con esta orden de examen
+    - mi derivación es ges
+- intent: farmacia
+  examples: |
+    - hay remedios para la diabetes en el cesfam
+    - quiero saber si llegó el losartán
+    - cuándo puedo retirar mis pastillas
+- intent: ver_retiros
+  examples: |
+    - cuándo me toca retirar
+    - tengo retiros programados

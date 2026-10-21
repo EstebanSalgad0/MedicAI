@@ -1,0 +1,132 @@
+# MedicAI — arquitectura de microservicios
+#   docker compose up -d --build
+#   Dashboard: http://localhost:8080   ·   Webhook de WhatsApp: http://<host>:8080/webhook
+
+x-python-service: &py
+  restart: unless-stopped
+  env_file: .env
+  networks: [backend]
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+
+x-build: &build
+  context: .
+
+services:
+  # ---------------- borde ----------------
+  gateway:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["${HTTP_PORT:-8080}:80"]
+    volumes: ["./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro"]
+    networks: [backend]
+    depends_on: [dashboard, analytics, orchestrator, whatsapp-gateway]
+
+  dashboard:
+    build: { <<: *build, dockerfile: dashboard/Dockerfile }
+    restart: unless-stopped
+    networks: [backend]
+
+  whatsapp-gateway:
+    <<: *py
+    build: { <<: *build, dockerfile: services/whatsapp-gateway/Dockerfile }
+    environment:
+      REDIS_URL: redis://redis:6379/0
+
+  # ---------------- núcleo conversacional ----------------
+  orchestrator:
+    <<: *py
+    build: { <<: *build, dockerfile: services/orchestrator/Dockerfile }
+    environment:
+      REDIS_URL: redis://redis:6379/1
+
+  nlu:
+    <<: *py
+    build: { <<: *build, dockerfile: services/nlu/Dockerfile }
+    depends_on:
+      nlu-rasa: { condition: service_healthy }
+
+  nlu-rasa:
+    build: { <<: *build, dockerfile: services/nlu-rasa/Dockerfile }
+    restart: unless-stopped
+    networks: [backend]
+
+  # ---------------- microservicios de dominio ----------------
+  ms-agendamiento:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-agendamiento/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/agendamiento
+
+  ms-recordatorios:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-recordatorios/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/recordatorios
+
+  ms-orientacion:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-orientacion/Dockerfile }
+    depends_on: []
+
+  ms-derivacion:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-derivacion/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/derivacion
+
+  ms-medicamentos:
+    <<: *py
+    build: { <<: *build, dockerfile: services/ms-medicamentos/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/medicamentos
+
+  # ---------------- datos y soporte ----------------
+  analytics:
+    <<: *py
+    build: { <<: *build, dockerfile: services/analytics/Dockerfile }
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-medicai}:${POSTGRES_PASSWORD}@postgres:5432/analytics
+
+  scheduler:
+    build: { <<: *build, dockerfile: services/scheduler/Dockerfile }
+    restart: unless-stopped
+    env_file: .env
+    networks: [backend]
+    depends_on: [ms-recordatorios, ms-agendamiento, ms-medicamentos, ms-derivacion]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medicai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: medicai
+      TZ: America/Santiago
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medicai}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: [redisdata:/data]
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+networks:
+  backend:
+
+volumes:
+  pgdata:
+  redisdata:

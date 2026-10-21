@@ -14,3 +14,12 @@ __pycache__/
 Thumbs.db
 .vscode/
 .idea/
+
+# MedicAI microservicios
+node_modules/
+dashboard/dist/
+*.db
+.pytest_cache/
+*.egg-info/
+reporte_nlu*.json
+services/nlu-rasa/models/
