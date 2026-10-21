@@ -7,7 +7,7 @@ from medicai_common.messages import DISCLAIMER, buttons, lst, text
 from medicai_common.safety import EMERGENCY_TEXT, MENTAL_HEALTH_TEXT, red_flag
 from medicai_common.textutil import normalize
 
-from . import reglas
+from . import animo, reglas, triaje
 
 FOOTER = "Orientación • MedicAI"
 CATEGORIAS = [
@@ -120,11 +120,18 @@ def handle(req: DialogRequest) -> DialogResponse:
 
     state = dict(req.state)
     opt = choice(req)
+    step = state.get("step")
+    # Salud mental: chequeo de ánimo
+    if req.intent == "salud_mental" and req.start or (opt and opt.startswith("ori:animo")) \
+            or (step or "").startswith("animo"):
+        return animo.handle(req, opt if opt != "ori:animo" else None, state if not req.start else {})
     if req.start:
         cat = (req.entities or {}).get("categoria_sintoma")
-        return ask_symptoms(cat) if cat in NOMBRE else ask_category()
+        return ask_symptoms(cat) if cat in NOMBRE else triaje.start(req)
+    # «Tengo síntomas»: triaje rápido (edad, síntomas, duración, alarma)
+    if (opt and opt.startswith("ori:t:")) or ((step or "").startswith("t_") and not (opt or "").startswith("ori:cat:")):
+        return triaje.handle(req, opt, state)
 
-    step = state.get("step")
     if opt and opt.startswith("ori:cat:"):
         arg = opt.split(":")[2]
         if arg in ("page1", "page2"):
@@ -150,4 +157,4 @@ def handle(req: DialogRequest) -> DialogResponse:
                          state={"step": "symptoms", "categoria": state["categoria"]})
     if opt == "agd:start":
         return reply(state=None, handoff=Handoff(service="agendamiento", intent="agendar_cita"))
-    return ask_category()
+    return triaje.start(req)
