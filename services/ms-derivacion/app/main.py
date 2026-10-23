@@ -10,13 +10,14 @@ from medicai_common.notify import send
 from medicai_common.service import create_service, require_internal, setup_logging
 from medicai_common.textutil import now_local
 
-from . import dialog
-from .models import Referral, SessionLocal, init_db
+from . import derivaciones, dialog
+from .models import Derivacion, Referral, SessionLocal, init_db
 
 SERVICE = "derivacion"
 log = setup_logging(SERVICE)
-app = create_service(SERVICE, "Guía de ruta para interconsultas, exámenes, recetas y derivaciones urgentes, "
-                              "con seguimiento del trámite.", on_startup=init_db)
+app = create_service(SERVICE, "Guía de ruta para pacientes y derivaciones clínicas con seguimiento "
+                              "(enviada / agendada / atendida / caducada).", on_startup=init_db)
+app.include_router(derivaciones.router)
 
 
 @app.post("/dialog", response_model=DialogResponse, dependencies=[Depends(require_internal)], tags=["chat"])
@@ -40,7 +41,7 @@ def tick():
                 sent += 1
                 events.emit("referral_followup_sent", service=SERVICE, user_id=ref.user_id)
         db.commit()
-    return {"sent": sent}
+    return {"sent": sent, "caducadas": derivaciones.caducar_vencidas()}
 
 
 @app.get("/stats", tags=["dashboard"])
@@ -48,4 +49,6 @@ def stats():
     with SessionLocal() as db:
         rows = db.execute(select(Referral.doc_type, Referral.status, func.count())
                           .group_by(Referral.doc_type, Referral.status)).all()
-    return {"referrals": [{"doc_type": d, "status": s, "total": n} for d, s, n in rows]}
+        clinicas = dict(db.execute(select(Derivacion.estado, func.count()).group_by(Derivacion.estado)).all())
+    return {"referrals": [{"doc_type": d, "status": s, "total": n} for d, s, n in rows],
+            "derivaciones": clinicas}

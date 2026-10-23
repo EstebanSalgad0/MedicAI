@@ -1,28 +1,40 @@
-# MedicAI — Agente IA para la gestión del acceso en Atención Primaria de Salud
+# MedicAI: asistente clínico y administrativo para la red asistencial
 
-Asistente conversacional por WhatsApp para pacientes de CESFAM de la Región del Maule, con un
-panel de indicadores para los equipos de salud. Construido como **microservicios en contenedores
-Docker**, con un **NLU híbrido (Rasa NLU + LLM de respaldo)** y telemetría que mide en vivo los
-atributos comprometidos en la formulación FONDEF IDeA I+D.
+MedicAI apoya a la red asistencial chilena (APS, atención secundaria y terciaria) del Maule en tres módulos,
+según el system prompt de Marcos Cereceda Otarola y Esteban Salgado
+([`prompts.py`](libs/medicai_common/medicai_common/prompts.py)). Su principio rector es **apoyar sin decidir**:
+toda salida clínica es una sugerencia que valida un profesional.
 
-| Microservicio | Qué resuelve para el paciente |
+| Módulo | Para quién | Qué hace |
+|---|---|---|
+| **1. Dashboard clínico** | Profesionales de salud (ClaveÚnica) | Perfil sintético del paciente desde una o varias bases de la red, consultadas en paralelo y con progreso visible. Incluye resumen, línea de tiempo de exámenes con valores fuera de rango, alertas (interacciones, controles pendientes, riesgo en crónicos), apoyo diagnóstico para validación y ficha por dictado para revisar y firmar. **Cada dato cita su fuente** `[Establecimiento · Exp. · fecha · sección]` y lo que falta se informa como «no se encontró» |
+| **2. Chatbot de pacientes** | Pacientes por WhatsApp | Horas, controles según el perfil, orientación de síntomas sin diagnóstico, recordatorios y traspaso humano. Ante una alarma indica 131 y ofrece avisar al equipo. **Nunca pide RUN, claves ni datos de pago por el chat**: la identidad se verifica con ClaveÚnica mediante un enlace seguro |
+| **3. Agendas y derivaciones** | Equipos del establecimiento | Ocupación por box y profesional en tiempo real. Reasignación de horas anuladas con prioridad clínica sobre el orden de llegada y el criterio explicado. Derivaciones intra y extra red con estados enviada / agendada / atendida / caducada, y registro de fecha, origen, destino y responsable |
+
+La correspondencia regla por regla entre el prompt y el código está en
+[docs/PROMPT_Y_CUMPLIMIENTO.md](docs/PROMPT_Y_CUMPLIMIENTO.md).
+
+| Microservicio | Qué resuelve |
 |---|---|
-| `ms-agendamiento` | Horas en el **Hospital Regional de Talca** (especialidades, con verificación de interconsulta, código HRT-XXXXXX y aviso GES) y en **CESFAM**; reagendar y cancelar; recordatorios 48 h y 24 h; **lista de espera y fill-the-gap** (el cupo liberado se ofrece al siguiente compatible) |
-| `ms-recordatorios` | Recordatorios de toma con dosis, aviso 10 min antes y confirmación por dosis (adherencia); aviso de **renovación de receta** 5 días antes |
-| `ms-orientacion` | **Triaje informativo** (edad, síntomas, duración, pregunta de alarma → nivel alto/medio/bajo con acción concreta), orientación detallada por categoría y **chequeo de ánimo** con derivación a salud mental. No diagnostica |
-| `ms-derivacion` | Guía de ruta para interconsultas (GES / no GES), exámenes, recetas y derivaciones urgentes, con seguimiento a 7 días |
-| `ms-medicamentos` | Disponibilidad de fármacos en CESFAM y **Farmacia Hospitalaria**, retiros programados y aviso de reposición de stock |
-| `ms-resultados` | Estado de **exámenes** (disponible / en proceso) tras verificar RUN y fecha de nacimiento, y aviso automático al validarse. Nunca muestra valores |
-| `ms-atencion` | **Trámites FONASA**, información del hospital, visitas y preparación de exámenes, **hablar con una persona** (la solicitud llega con el resumen de la conversación) y **modo cuidador** |
+| `ms-historial` | **Módulo 1.** Ficha clínica multi-establecimiento con citas, alertas, apoyo diagnóstico y ficha por dictado. Permisos por rol y relación asistencial, con auditoría de cada acceso |
+| `ms-identidad` | **ClaveÚnica** (OpenID Connect) para profesionales y pacientes. Vincula el WhatsApp del paciente con su RUN sin pedirlo por el chat. Incluye el registro web del modo cuidador y el alta de profesionales |
+| `ms-agendamiento` | Horas en el **Hospital Regional de Talca** y en **CESFAM**, recordatorios a 48 y 24 h, lista de espera con **prioridad clínica** y fill-the-gap con el criterio registrado, **ocupación por box y profesional** y controles sugeridos según la ficha |
+| `ms-derivacion` | Guía de ruta para el paciente y **derivaciones clínicas con seguimiento** (estados, historial, caducidad por plazo, aviso al paciente) |
+| `ms-recordatorios` | Recordatorios de toma con dosis y confirmación por dosis, y aviso de renovación de receta |
+| `ms-orientacion` | Triaje informativo, orientación por categoría y chequeo de ánimo. No diagnostica |
+| `ms-medicamentos` | Disponibilidad de fármacos en CESFAM y Farmacia Hospitalaria, y retiros programados |
+| `ms-resultados` | Estado de exámenes (disponible / en proceso) con identidad verificada por ClaveÚnica. Nunca muestra valores |
+| `ms-atencion` | Trámites FONASA, información del hospital, **hablar con una persona** (también ante emergencias) y modo cuidador |
 
-Más el núcleo: `whatsapp-gateway`, `orchestrator` (menú, detector de emergencias, modo cuidador y **modo gestión**
-con analítica conversacional), `nlu` + `nlu-rasa`, `analytics`, `scheduler`, `dashboard` y un `gateway` nginx,
-sobre PostgreSQL (una base por servicio) y Redis.
+Más el núcleo: `whatsapp-gateway`, `orchestrator` (menú, detector de emergencias, modo cuidador y modo gestión),
+`nlu` + `nlu-rasa`, `analytics`, `scheduler`, `dashboard`, un `gateway` nginx y, opcionalmente, `ollama`
+(modelo de lenguaje **100 % local** con GPU), sobre PostgreSQL (una base por servicio) y Redis.
 
-El **dashboard** tiene: *Hospital* (tablero de gestión en vivo: camas, urgencias, ausentismo, fill-the-gap, chatbot,
-pabellones, listas de espera, alertas y preguntas en lenguaje natural), *Indicadores*, *Satisfacción*, *Agenda*,
-*Farmacia*, *Contacto* (bandeja de solicitudes) y *Simulador*. En el prototipo, camas, urgencias, pabellones y listas
-de espera son **datos simulados**; el resto son datos reales del sistema.
+El **dashboard** se ordena por módulo y muestra a cada funcionario solo lo que su rol permite. La *Ficha clínica*
+es exclusiva de roles clínicos que ingresan con ClaveÚnica. *Agenda* y *Derivaciones* corresponden al Módulo 3.
+*Farmacia*, *Contacto* y *Simulador* corresponden al chatbot, y *Hospital*, *Indicadores* y *Satisfacción* a la
+gestión. En el prototipo los registros clínicos, la dotación de box y los datos de camas, urgencias y
+pabellones son **simulados**.
 Detalle en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) y relación con la postulación en
 [docs/ALINEACION_FORMULACION.md](docs/ALINEACION_FORMULACION.md).
 
@@ -39,7 +51,8 @@ docker compose up -d --build  # la primera vez entrena el modelo Rasa dentro de 
 docker compose ps             # todos los servicios deben quedar "healthy" / "running"
 ```
 
-- **Dashboard:** http://localhost:8080 (usuario y clave de `DASHBOARD_USER` / `DASHBOARD_PASSWORD`).
+- **Dashboard:** http://localhost:8080. Los profesionales entran con *Ingresar con ClaveÚnica* (simulada en modo
+  demo). La cuenta local `DASHBOARD_USER` / `DASHBOARD_PASSWORD` es solo de administración y no abre fichas.
 - **Simulador:** pestaña *Simulador* del dashboard. Permite probar todos los flujos sin WhatsApp; esas
   conversaciones quedan con canal «Simulador» y se pueden excluir de los indicadores.
 - **Sin credenciales de WhatsApp** el gateway arranca en modo `DRY_RUN`: procesa todo y registra los
@@ -76,19 +89,32 @@ docker compose ps             # todos los servicios deben quedar "healthy" / "ru
 Si prefieres la Cloud API de Meta directa, completa `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`,
 `WHATSAPP_APP_SECRET` y `WHATSAPP_VERIFY_TOKEN` y registra `https://<dominio>/webhook` en Meta for Developers.
 
-### Activar el LLM de respaldo (opcional)
+### Ingreso con ClaveÚnica
 
-Por defecto el NLU usa Rasa y, si Rasa duda, un clasificador de reglas. Para sumar un LLM:
+- **Profesionales:** botón «Ingresar con ClaveÚnica» del dashboard. Solo entran los RUN habilitados
+  (variable `PROFESIONALES` o la API `/api/identidad/profesionales`), con su rol y sus establecimientos.
+- **Pacientes:** cuando un trámite necesita identidad (resultados, derivaciones, modo cuidador), el chat envía
+  un enlace de un solo uso a `PUBLIC_BASE_URL/id/vincular/...`, que debe ser la URL pública del sistema.
+- **Modo demo** (`CLAVEUNICA_MODE=demo`, por defecto): un simulador reemplaza la página de ClaveÚnica y
+  carga profesionales de prueba, como la Dra. Ana Rojas (médica en CESFAM Las Américas y HRT). El paciente
+  de demostración con datos en dos establecimientos es el RUN **12.345.678-5**.
+- **Producción:** `CLAVEUNICA_MODE=produccion`, `CLAVEUNICA_CLIENT_ID` y `CLAVEUNICA_CLIENT_SECRET`
+  entregados por Gobierno Digital, y `https://<dominio>/id/callback` registrado como redirect URI.
 
-```env
-LLM_PROVIDER=anthropic      # o "openai" para cualquier API compatible (p. ej. Ollama en el servidor del Servicio de Salud)
-LLM_API_KEY=...
-LLM_MODEL=claude-haiku-5-5
+### Modelo de lenguaje local (opcional)
+
+El sistema funciona completo con reglas. Para sumar el modelo local (respaldo del NLU, apoyo diagnóstico y
+orden del dictado):
+
+```bash
+docker compose --profile llm up -d ollama          # requiere GPU NVIDIA + nvidia-container-toolkit
+docker compose exec ollama ollama pull qwen2.5:7b  # o el modelo que defina LLM_MODEL
 ```
 
-El LLM solo elige una intención de una lista cerrada; nunca redacta respuestas al paciente ni decide
-orientación clínica. Antes de enviar texto se enmascaran RUT, teléfonos y correos. Con `openai` +
-Ollama local los datos no salen de la infraestructura.
+Con `LLM_PROVIDER=ollama` (valor por defecto) ningún dato sale de la red. Un proveedor externo
+(`anthropic`) queda bloqueado salvo `LLM_ALLOW_EXTERNAL=true`, y aun así nunca recibe datos clínicos.
+Las salidas del modelo se validan: una hipótesis sin cita a un registro real se descarta, y un dictado
+reordenado con texto que no estaba en la transcripción también se descarta.
 
 ## Validación y evidencia
 
@@ -113,7 +139,7 @@ Cada servicio es una app FastAPI independiente que, sin `DATABASE_URL`, usa SQLi
 guarda sesiones en memoria:
 
 ```bash
-pip install -e libs/medicai_common fastapi "uvicorn[standard]" sqlalchemy httpx redis PyJWT pyyaml pytest
+pip install -e libs/medicai_common fastapi "uvicorn[standard]" sqlalchemy httpx redis PyJWT pyyaml pytest python-multipart tzdata
 cd services/ms-agendamiento && uvicorn app.main:app --port 8101 --reload   # docs en /docs
 cd dashboard && npm install && npm run dev                                  # proxy /api -> localhost:8080
 ```
@@ -121,7 +147,7 @@ cd dashboard && npm install && npm run dev                                  # pr
 ## Estructura
 
 ```
-libs/medicai_common/     contrato de diálogo, mensajes, eventos, utilidades compartidas
+libs/medicai_common/     system prompt, contrato de diálogo, mensajes, eventos, identidad, LLM local, utilidades
 services/<servicio>/     app/ (código), tests/, Dockerfile, requirements.txt
 services/nlu-rasa/       datos de entrenamiento, configuración y conjunto de prueba de Rasa
 dashboard/               React + Vite

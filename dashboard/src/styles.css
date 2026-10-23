@@ -326,3 +326,67 @@ td.num { white-space: nowrap; }
   .tbars-track { grid-column: 1 / -1; grid-row: 2; }
   .tbars-detail { display: none; }
 }
+
+/* ---------- ingreso con ClaveÚnica ---------- */
+.login-card { width: min(400px, 100%); display: grid; gap: 14px; padding: 28px; }
+.login-form { display: grid; gap: 12px; }
+.login-form label { display: grid; gap: 5px; font-size: 13px; color: var(--ink-2); }
+.cu-btn { display: block; text-align: center; text-decoration: none; padding: 11px 14px; }
+.side-foot .who span { display: block; font-size: 12px; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---------- formularios compactos ---------- */
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.row label { display: grid; gap: 4px; }
+.stack { display: grid; gap: 10px; }
+textarea { font: inherit; color: inherit; width: 100%; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; padding: 8px 10px; resize: vertical; }
+textarea:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; margin-right: 14px; }
+.ests { border: 0; padding: 0; margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 6px 0; }
+.ests legend { padding: 0; margin-bottom: 6px; }
+.ficha-busqueda { display: grid; gap: 12px; }
+.clickable { cursor: pointer; }
+
+/* ---------- ficha clínica (Módulo 1) ---------- */
+.fuentes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.fuente { display: inline-flex; flex-direction: column; padding: 7px 12px; border-radius: 10px; background: var(--surface);
+  border: 1px solid var(--border); font-size: 13.5px; min-width: 170px; }
+.fuente small { color: var(--muted); font-size: 12px; }
+.fuente.f-ok { border-left: 3px solid var(--good); }
+.fuente.f-sin_registros { border-left: 3px solid var(--axis); }
+.fuente.f-error, .fuente.f-tiempo_agotado { border-left: 3px solid var(--critical); }
+.fuente.f-pendiente { border-left: 3px solid var(--warning); }
+.paciente-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.paciente-head p { margin: 4px 0 0; }
+.clin-h { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.clin-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+.clin-list li { border-bottom: 1px solid var(--grid); padding-bottom: 7px; }
+.clin-list li:last-child { border-bottom: 0; }
+.clin-list li.alergia b { color: var(--critical-ink); }
+.cita { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.faltante { color: var(--ink-2); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-size: 13.5px; margin: 0; }
+.alertas { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.alerta { display: grid; grid-template-columns: 76px 1fr; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--surface-2); border-left: 4px solid var(--axis); font-size: 14px; }
+.alerta.nivel-alta { border-left-color: var(--critical); background: var(--critical-soft); }
+.alerta.nivel-media { border-left-color: var(--warning); }
+.alerta-nivel { font-weight: 650; font-size: 12.5px; }
+.nivel-alta .alerta-nivel { color: var(--critical-ink); }
+tr.ex-alto td, tr.ex-bajo td { background: var(--critical-soft); }
+tr.ex-alto b, tr.ex-bajo b { color: var(--critical-ink); }
+.hipotesis { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px; }
+.hipotesis.urgente { border-color: var(--critical); }
+.ficha-sec { display: grid; gap: 4px; font-size: 14px; }
+details.card summary { cursor: pointer; }
+.timeline { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 6px; }
+
+/* ---------- ocupación (Módulo 3) ---------- */
+table.ocupacion td.cupo { text-align: center; width: 44px; padding: 6px 4px; font-size: 13px; border-left: 1px solid var(--surface); }
+.cupo-ocupada { background: color-mix(in srgb, var(--series-1) 30%, transparent); }
+.cupo-atendida { background: color-mix(in srgb, var(--good) 28%, transparent); }
+.cupo-inasistencia { background: color-mix(in srgb, var(--critical) 28%, transparent); }
+.cupo-ofrecida { background: color-mix(in srgb, var(--warning) 35%, transparent); }
+.cupo-libre { background: var(--surface-2); }
+.cupo-pasada { background: transparent; color: var(--muted); }
+.legend i.box.cupo-libre { border: 1px solid var(--axis); }

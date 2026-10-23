@@ -87,6 +87,28 @@ def update_ticket(ticket_id: int, body: StatusIn):
         return _ticket(t)
 
 
+class CaregiverIn(BaseModel):
+    caregiver_id: str = Field(min_length=1, max_length=120)
+    caregiver_name: str = Field(min_length=1, max_length=120)
+    caregiver_run: str = Field(min_length=3, max_length=12)
+    patient_name: str = Field(min_length=3, max_length=120)
+    patient_run: str = Field(min_length=3, max_length=12)
+    relationship: str = Field(min_length=2, max_length=30)
+
+
+@app.post("/internal/caregivers", dependencies=[Depends(require_internal)], tags=["interno"])
+def create_caregiver(body: CaregiverIn):
+    """Lo llama ms-identidad cuando el cuidador completa el registro tras ingresar con ClaveÚnica."""
+    with SessionLocal() as db:
+        c = Caregiver(**body.model_dump())
+        db.add(c)
+        db.commit()
+        cid = c.id
+    events.emit("caregiver_registered", service=SERVICE, user_id=body.caregiver_id,
+                props={"relationship": body.relationship, "verificado": "claveunica"})
+    return {"id": cid}
+
+
 @app.get("/caregivers/stats", tags=["dashboard"])
 def caregiver_stats():
     with SessionLocal() as db:

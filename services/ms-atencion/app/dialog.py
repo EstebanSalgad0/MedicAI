@@ -2,7 +2,7 @@
 una persona (con contexto) y modo cuidador."""
 from __future__ import annotations
 
-from medicai_common import hospital, rut
+from medicai_common import hospital, identidad, rut
 from medicai_common.contracts import DialogRequest, DialogResponse, DomainEvent, reply
 from medicai_common.matching import choice, remember_menu
 from medicai_common.messages import buttons, lst, text
@@ -14,7 +14,8 @@ from .models import Caregiver, SessionLocal, Ticket
 FOOTER = "Atención • MedicAI"
 TEMAS = [("agenda", "📅 Horas y agenda"), ("resultados", "📋 Resultados"), ("fonasa", "💳 FONASA"),
          ("reclamo", "📣 Reclamo"), ("sugerencia", "💡 Sugerencia"), ("otro", "❓ Otro tema")]
-TEMA_NOMBRE = {k: v.split(" ", 1)[1] for k, v in TEMAS} | {"saludmental": "Salud mental"}
+TEMA_NOMBRE = {k: v.split(" ", 1)[1] for k, v in TEMAS} | {"saludmental": "Salud mental",
+                                                          "urgencia": "Urgencia (alarma detectada)"}
 RELACIONES = [("hijo", "Hijo/a"), ("pareja", "Cónyuge o pareja"), ("padre", "Madre o padre"),
               ("hermano", "Hermano/a"), ("otro", "Otro familiar o cuidador")]
 
@@ -122,50 +123,28 @@ def acting_menu(p: Caregiver) -> DialogResponse:
                  events=[DomainEvent(type="caregiver_acting", props={"relationship": p.relationship})])
 
 
-REG_STEPS = {
-    "c_name": "✍️ Primero tus datos. ¿Cuál es tu *nombre completo*?",
-    "c_run": "✍️ ¿Cuál es tu *RUN*? (ej: 12.345.678-5)",
-    "p_name": "✍️ Ahora la persona a tu cargo. ¿Cuál es su *nombre completo*?",
-    "p_run": "✍️ ¿Cuál es su *RUN*?",
-}
+def ask_registration(req: DialogRequest) -> DialogResponse:
+    """El registro del cuidador se hace fuera del chat: ingresa con ClaveÚnica y completa los
+    datos de la persona a cargo en una página segura. El chat nunca pide RUN."""
+    return reply(identidad.pedir_claveunica(req.user_id, "cuidador", "registrar a una persona a tu cargo", FOOTER),
+                 state=None, events=[DomainEvent(type="identity_requested", props={"proposito": "cuidador"})])
 
 
-def ask_reg(state: dict, step: str, error: str = "") -> DialogResponse:
-    if step == "rel":
-        msg = lst(f"¿Qué relación tienes con *{state['p_name']}*?", [(f"ate:cui:rel:{k}", v) for k, v in RELACIONES],
-                  FOOTER, "Elegir")
-        return reply(msg, state=remember_menu({**state, "step": "rel"}, msg))
-    if step == "confirm":
-        msg = buttons(f"📋 *Confirma el registro*\n\n👤 Cuidador/a: {state['c_name']} ({rut.mask(state['c_run'])})\n"
-                      f"🧓 Paciente: {state['p_name']} ({rut.mask(state['p_run'])})\n"
-                      f"🔗 Relación: {dict(RELACIONES)[state['rel']]}\n\n"
-                      f"Declaro que *{state['p_name']}* me autorizó a gestionar sus horas, resultados y "
-                      "recordatorios. Puede revocar esta autorización cuando quiera en *Admisión*.",
-                      [("ate:cui:save:yes", "✅ Sí, registrar"), ("ate:cui:save:no", "❌ Cancelar")], FOOTER)
-        return reply(msg, state=remember_menu({**state, "step": "confirm"}, msg))
-    return reply(text((f"😕 {error}\n\n" if error else "") + REG_STEPS[step]), state={**state, "step": step})
-
-
-def register(req: DialogRequest, state: dict) -> DialogResponse:
-    with SessionLocal() as db:
-        p = Caregiver(caregiver_id=req.user_id, caregiver_name=state["c_name"], caregiver_run=state["c_run"],
-                      patient_name=state["p_name"], patient_run=state["p_run"],
-                      relationship=dict(RELACIONES)[state["rel"]])
-        db.add(p)
-        db.commit()
-        pid, name = p.id, p.patient_name
-    msg = buttons(f"✅ Listo, quedaste registrado/a como cuidador/a de *{name}*.\n\n"
-                  f"{name} puede revocar esta autorización en cualquier momento en Admisión.",
-                  [(f"ate:cui:act:{pid}", f"👤 Gestionar ahora")], FOOTER)
-    return reply(msg, state=None, resolved=True,
-                 events=[DomainEvent(type="caregiver_registered", props={"relationship": state["rel"]})])
+def urgent_ticket(req: DialogRequest) -> DialogResponse:
+    """Traspaso humano ante una emergencia: se crea la solicitud de inmediato, sin preguntas."""
+    resp = create_ticket(req, "urgencia", "Señal de alarma detectada por el chat. Revisar la conversación y "
+                                          "contactar al paciente.")
+    resp.messages = [text("🚨 Avisé al equipo del hospital y verán tu caso con prioridad.\n\n"
+                          "*No esperes su respuesta:* si es una emergencia llama ahora al *SAMU 131* "
+                          "o acude a la urgencia más cercana.")]
+    return resp
 
 
 def cuidador(req: DialogRequest, parts: list[str], state: dict) -> DialogResponse:
     action = parts[2] if len(parts) > 2 else ""
     acting = (req.entities or {}).get("acting") or {}
     if action == "new":
-        return ask_reg({}, "c_name")
+        return ask_registration(req)
     if action == "act":
         with SessionLocal() as db:
             p = db.get(Caregiver, int(parts[3]))
@@ -192,12 +171,6 @@ def cuidador(req: DialogRequest, parts: list[str], state: dict) -> DialogRespons
             run, name = p.patient_run, p.patient_name
         salir = {} if acting.get("id", "").endswith(f":{run}") else None
         return reply(text(f"🗑️ Ya no gestionas los trámites de *{name}*."), state=None, resolved=True, acting=salir)
-    if action == "rel" and state.get("step") == "rel":
-        return ask_reg({**state, "rel": parts[3]}, "confirm")
-    if action == "save" and state.get("step") == "confirm":
-        if parts[3] == "yes":
-            return register(req, state)
-        return reply(text("👍 No registré a nadie."), state=None)
     return cuidador_menu(req)
 
 
@@ -239,16 +212,16 @@ def handle(req: DialogRequest) -> DialogResponse:
         if kind in ("info", "visitas", "prep"):
             return info(kind)
         if kind == "humano":
+            if len(parts) > 2 and parts[2] == "urgencia":
+                return urgent_ticket(req)
             return ask_summary(parts[2]) if len(parts) > 2 else ask_topic()
         if kind == "cui":
             return cuidador(req, parts, state)
     step = state.get("step")
     if step == "summary" and req.text.strip():
         return create_ticket(req, state["topic"], req.text.strip())
-    if step in REG_STEPS:
-        return registration_text(req, state)
     if step == "fonasa":
         return fonasa_menu()
     if step == "topic":
         return ask_topic()
-    return cuidador_menu(req) if step in ("cui", "rel", "confirm") else ask_topic()
+    return cuidador_menu(req) if step == "cui" else ask_topic()

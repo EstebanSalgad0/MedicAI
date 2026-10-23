@@ -141,7 +141,10 @@ def with_menu_button(messages: list) -> list:
             titles = [o.title for o in last.options] + [MENU_OPTION[1]]
             messages[-1] = buttons(last.text, list(zip(ids, titles)), last.footer)
         return messages
-    if len(last.text) <= 1024:  # límite del cuerpo de un mensaje interactivo de WhatsApp
+    if "http://" in last.text or "https://" in last.text:
+        # un enlace (p. ej. ClaveÚnica) debe ir en un mensaje de texto para que WhatsApp lo abra
+        messages.append(buttons("¿Te ayudo con algo más mientras tanto?", [MENU_OPTION], FOOTER))
+    elif len(last.text) <= 1024:  # límite del cuerpo de un mensaje interactivo de WhatsApp
         messages[-1] = buttons(last.text, [MENU_OPTION], last.footer)
     else:
         messages.append(buttons("¿Te ayudo con algo más?", [MENU_OPTION], FOOTER))
@@ -159,3 +162,9 @@ def survey_thanks():
 
 def unsupported_media():
     return text("📎 Por ahora solo puedo leer mensajes de texto. ¿Me lo escribes, por favor?")
+
+
+def emergency_handoff():
+    """Tras la tarjeta de emergencia: ofrecer que el equipo humano contacte al paciente."""
+    return buttons("Si quieres, aviso ahora al equipo del hospital para que revise tu caso y te contacte.",
+                   [("ate:humano:urgencia", "🚨 Avisar al equipo"), MENU_OPTION], FOOTER)

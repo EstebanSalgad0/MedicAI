@@ -5,12 +5,13 @@ import json
 from datetime import timedelta
 from pathlib import Path
 
+from medicai_common import identidad
 from medicai_common.contracts import DialogRequest, DialogResponse, DomainEvent, reply
 from medicai_common.matching import choice, remember_menu
 from medicai_common.messages import Message, buttons, lst, text
 from medicai_common.textutil import normalize, now_local
 
-from . import contenidos
+from . import contenidos, derivaciones
 from .models import Referral, SessionLocal
 
 FOOTER = "Guía de Ruta • MedicAI"
@@ -20,6 +21,7 @@ TIPOS = [
     ("der:type:receta", "💊 Receta", "Indicación de tratamiento"),
     ("der:type:urgente", "🚨 Derivación urgente", "Te indicaron ir a urgencia"),
     ("der:type:otro", "❓ No estoy seguro/a", "Requisitos generales"),
+    ("der:estado", "📍 Estado de mi derivación", "Si tu médico ya te derivó"),
 ]
 DIRECTORIO = json.loads((Path(__file__).parent / "data" / "establecimientos_urgencia.json").read_text())["comunas"]
 
@@ -96,12 +98,36 @@ def followup_answer(ref_id: int, answer: str, req: DialogRequest) -> DialogRespo
                                      props={"contacted": answer == "yes", "days_open": days_open})])
 
 
+def estado_derivaciones(req: DialogRequest) -> DialogResponse:
+    """Estado de las derivaciones del paciente, con identidad verificada por ClaveÚnica."""
+    run = identidad.run_verificado(req.user_id)
+    if not run:
+        return reply(identidad.pedir_claveunica(req.user_id, "derivacion", "ver tus derivaciones", FOOTER),
+                     state=None)
+    items = derivaciones.de_paciente(run)
+    if not items:
+        body = ("📭 No encontré derivaciones registradas a tu nombre en la red.\n\n"
+                "Si tu médico te entregó una interconsulta en papel, llévala al SOME de tu CESFAM.")
+    else:
+        lineas = []
+        for d in items:
+            cuando = f" · {d['fecha_cita']:%d-%m-%Y %H:%M}" if d["estado"] == "agendada" and d["fecha_cita"] else ""
+            lineas.append(f"*{d['especialidad']}* en {d['destino']}\n"
+                          f"{derivaciones.ESTADO_PACIENTE[d['estado']]}{cuando}")
+        body = "📍 *Tus derivaciones*\n\n" + "\n\n".join(lineas)
+    return reply(buttons(body[:1000], [("der:start", "🧭 Guía de ruta")], FOOTER), state=None, resolved=True,
+                 events=[DomainEvent(type="referral_status_checked", props={"total": len(items)})])
+
+
 def handle(req: DialogRequest) -> DialogResponse:
     state = dict(req.state)
     opt = choice(req)
+    if opt == "der:estado" or (req.start and (req.entities or {}).get("tipo_documento") == "estado"):
+        return estado_derivaciones(req)
     if req.start:
         doc = (req.entities or {}).get("tipo_documento")
-        return on_type(doc, {}) if doc in {t[0].split(":")[2] for t in TIPOS} else ask_type()
+        tipos = {t[0].split(":")[2] for t in TIPOS if t[0].startswith("der:type:")}
+        return on_type(doc, {}) if doc in tipos else ask_type()
 
     if opt and opt.startswith("der:fu:"):
         _, _, ref_id, answer = opt.split(":")

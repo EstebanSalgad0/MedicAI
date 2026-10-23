@@ -16,7 +16,7 @@ from medicai_common.matching import choice, remember_menu
 from medicai_common.messages import buttons, lst, text
 from medicai_common.textutil import normalize, now_local
 
-from . import gap
+from . import gap, perfil
 from .catalog import (CENTRO_NOMBRE, CENTROS, DIAS_HABILES_A_OFRECER, ESPECIALIDADES_HRT, GES_PALABRAS, HORARIOS,
                       HORARIOS_HRT, HRT, PRESTACION_NOMBRE, PRESTACIONES, REQUIERE_DERIVACION, SOLO_HOSPITAL)
 from .models import Appointment, GapOffer, SessionLocal, Waitlist
@@ -123,12 +123,17 @@ def offer_waitlist(state: dict, motivo: str) -> DialogResponse:
 # ---------- CESFAM ----------
 
 def ask_prestacion(state: dict, page: int = 1) -> DialogResponse:
+    # controles pendientes según el perfil del paciente (crónico, niño sano, embarazo, vacunas) primero
+    sug = {s["prestacion"]: s["motivo"] for s in state.get("sug") or [] if s.get("prestacion") in APS_IDS}
+    orden = sorted(PRESTACIONES, key=lambda p: p[0] not in sug)
     if page == 1:
-        opts = [(f"agd:esp:{k}", v) for k, v in PRESTACIONES[:9]] + [("agd:esp:page2", "➡️ Ver más")]
-        body = ("🏠 *Hora en tu CESFAM*\n\n¿Qué tipo de atención necesitas?\n"
+        opts = [(f"agd:esp:{k}", v, f"📌 {sug[k]}"[:72]) if k in sug else (f"agd:esp:{k}", v) for k, v in orden[:9]]
+        opts.append(("agd:esp:page2", "➡️ Ver más"))
+        aviso = ("📌 *Según tu ficha:* " + "; ".join(sug.values()) + ".\n\n") if sug else ""
+        body = ("🏠 *Hora en tu CESFAM*\n\n" + aviso + "¿Qué tipo de atención necesitas?\n"
                 "_Para especialidades, elige *Hospital Regional* en el menú de agendamiento._")
     else:
-        opts = [(f"agd:esp:{k}", v) for k, v in PRESTACIONES[9:]] + [("agd:esp:page1", "⬅️ Volver")]
+        opts = [(f"agd:esp:{k}", v) for k, v in orden[9:]] + [("agd:esp:page1", "⬅️ Volver")]
         body = "Otras atenciones disponibles:"
     msg = lst(body, opts, FOOTER, "Ver atenciones")
     return reply(msg, state=remember_menu({**state, "step": "prestacion"}, msg))
@@ -472,7 +477,9 @@ def handle(req: DialogRequest) -> DialogResponse:
                      state=None)
 
     if action == "place":
-        return ask_especialidad(state) if arg == HRT else ask_prestacion(state)
+        if arg == HRT:
+            return ask_especialidad(state)
+        return ask_prestacion({**state, "sug": perfil.sugeridos(req.user_id)})
     if action == "esp":
         if arg in ("page1", "page2"):
             return ask_prestacion(state, page=int(arg[-1]))

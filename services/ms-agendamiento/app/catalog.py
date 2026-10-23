@@ -48,3 +48,22 @@ GES_PALABRAS = {
     "vicio de refraccion": "vicio de refracción", "estrabismo": "estrabismo", "epilepsia": "epilepsia",
     "hipoacusia": "hipoacusia", "marcapaso": "trastornos de conducción (marcapaso)",
 }
+
+# Dotación por establecimiento: qué profesional atiende cada prestación y en qué box.
+# Datos de demostración: reemplazar por la programación real de cada centro (o integrarla).
+_NOMBRES_PRO = ["Dra. Paula Ortiz", "Dr. Andrés Leiva", "E.U. Camila Reyes", "Mat. Daniela Vera", "Dra. Sofía Navarro",
+                "Ps. Tomás Acuña", "Klgo. Felipe Araya", "Dr. Ignacio Paredes", "Nut. Valentina Cid",
+                "TENS Rodrigo Salas", "E.U. Francisca Lagos", "Dra. Constanza Mella", "Pod. Javier Tapia"]
+
+
+def dotacion(center_id: str) -> list[dict]:
+    prestaciones = ESPECIALIDADES_HRT if center_id == HRT else PRESTACIONES
+    offset = sum(map(ord, center_id)) % len(_NOMBRES_PRO)
+    return [{"prestacion": k, "prestacion_nombre": PRESTACION_NOMBRE[k],
+             "profesional": _NOMBRES_PRO[(i + offset) % len(_NOMBRES_PRO)],
+             "box": f"{'Policlínico ' if center_id == HRT else 'Box '}{i + 1}"}
+            for i, (k, _) in enumerate(prestaciones)]
+
+
+# Prioridad en la lista de espera: la prioridad clínica prevalece sobre el orden de llegada
+PRIORIDAD_NOMBRE = {0: "Orden de llegada", 1: "GES (garantía de oportunidad)", 2: "Prioridad clínica"}

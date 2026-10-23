@@ -1,24 +1,13 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import datetime
 
-from sqlalchemy import Date, DateTime, Integer, String, func
+from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from medicai_common.service import Base, make_db
 
 engine, SessionLocal = make_db("resultados.db")
-
-
-class Patient(Base):
-    """Identidad verificada de quien consulta (o del paciente, en modo cuidador)."""
-
-    __tablename__ = "patients"
-
-    user_id: Mapped[str] = mapped_column(String(120), primary_key=True)
-    run: Mapped[str] = mapped_column(String(12), index=True)
-    birth_date: Mapped[date] = mapped_column(Date)
-    verified_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class ResultWatch(Base):

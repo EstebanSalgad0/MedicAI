@@ -109,3 +109,65 @@ def test_mis_citas_vacio():
 def test_boton_confirmar_antiguo_no_falla():
     r = turn({}, option_id="agd:confirm:yes")  # trámite ya cerrado: llega sin estado
     assert "ya no está vigente" in r["messages"][0]["text"] and r["state"] is None
+
+
+# ---------- Módulo 3: agenda centralizada y prioridad clínica ----------
+from datetime import datetime, timedelta  # noqa: E402
+from unittest.mock import patch  # noqa: E402
+
+from app import dialog as agd_dialog  # noqa: E402
+from app.models import SessionLocal, Waitlist  # noqa: E402
+from medicai_common import auth  # noqa: E402
+
+
+def hdr(rol="some"):
+    t, _ = auth.emitir(auth.Funcionario(sub="x", nombre="Luis Pino", rol=rol, establecimientos=["las_americas"]))
+    return {"Authorization": f"Bearer {t}"}
+
+
+def test_ocupacion_por_box_y_profesional():
+    r = turn({}, option_id="agd:place:cesfam", user="569900")
+    r = turn(r["state"], option_id="agd:esp:medicina_general", user="569900")
+    r = turn(r["state"], option_id="agd:center:las_americas", user="569900")
+    slot = r["messages"][0]["options"][1]["id"].split(":", 2)[2]
+    r = turn(r["state"], option_id=f"agd:slot:{slot}", user="569900")
+    turn(r["state"], option_id="agd:confirm:yes", user="569900")
+    o = client.get("/ocupacion", params={"center_id": "las_americas", "fecha": slot[:10]}).json()
+    fila = next(f for f in o["filas"] if f["prestacion"] == "medicina_general")
+    assert fila["profesional"] and fila["box"].startswith("Box")
+    assert next(s for s in fila["slots"] if s["hora"] == slot[11:16])["estado"] == "ocupada"
+    assert o["resumen"]["usados"] >= 1
+    assert len(o["filas"]) == len(client.get("/catalog").json()["dotacion"]["las_americas"])
+
+
+def test_prioridad_clinica_prevalece_y_se_explica():
+    with SessionLocal() as db:
+        db.add_all([Waitlist(user_id="antiguo", center_id="las_americas", prestacion="nutricion", priority=0,
+                             created_at=datetime(2026, 1, 1)),
+                    Waitlist(user_id="nuevo", center_id="las_americas", prestacion="nutricion", priority=0,
+                             created_at=datetime(2026, 3, 1))])
+        db.commit()
+    w = [x for x in client.get("/waitlist").json() if x["prestacion"] == "nutricion"]
+    nuevo = next(x for x in w if str(x["created_at"]).startswith("2026-03"))
+    assert client.patch(f"/waitlist/{nuevo['id']}", json={"priority": 2}, headers=hdr()).status_code == 422
+    r = client.patch(f"/waitlist/{nuevo['id']}", json={"priority": 2, "motivo": "Desnutrición en adulto mayor"},
+                     headers=hdr())
+    assert r.json()["priority_by"].startswith("Luis Pino")
+    sent.clear()
+    dia = datetime.now().date() + timedelta(days=3)
+    while dia.weekday() >= 5:
+        dia += timedelta(days=1)
+    assert gap.offer_gap("las_americas", "nutricion", datetime(dia.year, dia.month, dia.day, 9, 30))
+    assert sent[0][0] == "nuevo"
+    oferta = client.get("/gap-offers").json()[0]
+    assert "Prioridad clínica" in oferta["criterio"] and "orden de llegada" in oferta["criterio"]
+    assert "Desnutrición" in oferta["criterio"]
+
+
+def test_controles_sugeridos_segun_perfil():
+    sug = [{"prestacion": "control_cronico", "motivo": "Tienes un control crónico pendiente"}]
+    with patch.object(agd_dialog.perfil, "sugeridos", lambda u: sug):
+        r = turn({}, option_id="agd:place:cesfam", user="569901")
+    m = r["messages"][0]
+    assert "Según tu ficha" in m["text"] and m["options"][0]["id"] == "agd:esp:control_cronico"
+    assert "pendiente" in m["options"][0]["description"]

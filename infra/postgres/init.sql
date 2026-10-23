@@ -7,3 +7,5 @@ CREATE DATABASE medicamentos;
 CREATE DATABASE analytics;
 CREATE DATABASE resultados;
 CREATE DATABASE atencion;
+CREATE DATABASE historial;
+CREATE DATABASE identidad;

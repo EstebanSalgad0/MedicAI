@@ -77,10 +77,11 @@ GUIONES = {
         ("opcion", "ori:t:dur:1-3", None),
         ("opcion", "ori:t:alarma:no", "Nivel"),
     ],
-    "resultados": [
-        ("opcion", "res:start", "RUN"),
-        ("texto", "12.345.678-5", None),
-        ("texto", "01-01-1960", "no muestro valores"),
+    "resultados": [  # sin RUN por el chat: se envía el enlace de ClaveÚnica
+        ("opcion", "res:start", "ClaveÚnica"),
+    ],
+    "estado_derivacion": [
+        ("opcion", "der:estado", "ClaveÚnica"),
     ],
     "fonasa": [
         ("opcion", "ate:fonasa", None),
@@ -95,17 +96,9 @@ GUIONES = {
         ("opcion", "ate:humano:agenda", None),
         ("texto", "Necesito ayuda para cambiar una hora", "solicitud"),
     ],
-    "cuidador": [
+    "cuidador": [  # el registro se completa en la web tras ingresar con ClaveÚnica
         ("opcion", "ate:cui", None),
-        ("opcion", "ate:cui:new", None),
-        ("texto", "Camila Soto", None),
-        ("texto", "12.345.678-5", None),
-        ("texto", "Juan Soto", None),
-        ("texto", "11.111.111-1", None),
-        ("opcion", "ate:cui:rel:hijo", None),
-        ("opcion", "ate:cui:save:yes", None),
-        ("opcion", 0, "Ahora gestionas"),
-        ("opcion", "ate:cui:exit", "Volviste"),
+        ("opcion", "ate:cui:new", "ClaveÚnica"),
     ],
     "info_hospital": [
         ("opcion", "ate:info", "Admisión"),
@@ -115,6 +108,7 @@ GUIONES = {
     ],
     "alarma": [
         ("texto", "no puedo respirar", "131"),
+        ("opcion", "ate:humano:urgencia", "Avisé al equipo"),
     ],
     "no_entendido": [
         ("texto", "asdfgh qwerty", "No logré entenderte"),

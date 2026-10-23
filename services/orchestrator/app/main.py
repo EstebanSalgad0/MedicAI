@@ -178,7 +178,9 @@ def process(msg: InboundMessage) -> OutboundReply:
             out.append(system.unsupported_media())
         elif flag:
             out.append(text_msg(MENTAL_HEALTH_TEXT if flag == "salud_mental" else EMERGENCY_TEXT))
+            out.append(system.emergency_handoff())  # traspaso humano obligatorio ante una emergencia
             meta["red_flag"] = flag
+            meta["human_handoff_offered"] = True
             nlu = {"intent": "emergencia", "confidence": 1.0, "source": "safety", "latency_ms": 0}
             end_session("red_flag")
         elif msg.option_id and msg.option_id.startswith("sys:"):

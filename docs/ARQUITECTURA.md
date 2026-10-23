@@ -5,7 +5,8 @@
 ```mermaid
 flowchart LR
     P([Paciente<br/>WhatsApp]) -->|webhook| GW
-    F([Funcionario APS<br/>navegador]) --> GW
+    F([Profesional / funcionario<br/>navegador]) --> GW
+    CU([ClaveÚnica]) <-->|OpenID Connect| ID
 
     subgraph borde[Borde]
         GW[gateway<br/>nginx · JWT · rate limit]
@@ -13,31 +14,37 @@ flowchart LR
 
     GW -->|/webhook| WA[whatsapp-gateway<br/>firma Meta · deduplicación · reintentos]
     GW -->|/| DASH[dashboard<br/>React]
+    GW -->|/id/*| ID[ms-identidad<br/>ClaveÚnica · vínculo WhatsApp↔RUN]
     GW -->|/api/*| AN
 
-    WA --> ORQ[orchestrator<br/>sesiones · enrutamiento · métricas]
+    WA --> ORQ[orchestrator<br/>sesiones · alarmas · enrutamiento]
     ORQ --> NLU[nlu<br/>híbrido]
     NLU --> RASA[nlu-rasa<br/>Rasa NLU · DIET]
-    NLU -.->|si Rasa duda| LLM[(LLM<br/>opcional)]
+    NLU -.->|si Rasa duda| LLM[(ollama<br/>modelo local · GPU)]
 
-    ORQ --> AGD[ms-agendamiento]
-    ORQ --> REC[ms-recordatorios]
-    ORQ --> ORI[ms-orientacion]
-    ORQ --> DER[ms-derivacion]
-    ORQ --> MED[ms-medicamentos]
+    subgraph m2[Módulo 2 · chatbot]
+        AGD[ms-agendamiento]
+        REC[ms-recordatorios]
+        ORI[ms-orientacion]
+        MED[ms-medicamentos]
+        RES[ms-resultados]
+        ATE[ms-atencion]
+    end
+    subgraph m1[Módulo 1 · ficha clínica]
+        HIS[ms-historial<br/>permisos · auditoría · citas]
+    end
+    DER[ms-derivacion<br/>Módulo 3 · derivaciones]
 
-    SCH[scheduler] -->|tick cada 60 s| AGD & REC & DER & MED
-    AGD & REC & DER & MED -->|mensajes proactivos| WA
+    ORQ --> AGD & REC & ORI & DER & MED & RES & ATE
+    RES & DER & ATE & AGD -->|¿identidad verificada?| ID
+    HIS -->|consulta en paralelo| FU[(Bases de cada establecimiento<br/>demo · FHIR R4)]
+    HIS -.->|apoyo y dictado| LLM
+    AGD -->|controles sugeridos| HIS
+    HIS -->|¿derivación activa?| DER
 
-    ORQ & AGD & REC & ORI & DER & MED & WA -->|eventos| AN[analytics<br/>KPIs · auth]
-
-    ORQ --- REDIS[(Redis<br/>sesiones)]
-    WA --- REDIS
-    AGD --- PG[(PostgreSQL<br/>1 base por servicio)]
-    REC --- PG
-    DER --- PG
-    MED --- PG
-    AN --- PG
+    SCH[scheduler] -->|tick cada 60 s| AGD & REC & DER & MED & RES
+    AGD & REC & DER & MED & RES & ID -->|mensajes proactivos| WA
+    ORQ & AGD & REC & ORI & DER & MED & HIS & WA -->|eventos seudonimizados| AN[analytics<br/>KPIs · cuentas locales]
 ```
 
 Solo el contenedor `gateway` publica un puerto. Todo lo demás vive en la red interna `backend`.
@@ -93,9 +100,44 @@ cada componente de IA (`scripts/evaluar_nlu.py` y gráfico «¿Quién interpret�
 - **Base por servicio.** Ningún servicio lee la base de otro.
 - **Analítica seudonimizada.** `analytics` guarda un hash salado del teléfono, nunca el número ni el
   texto de los mensajes. Los eventos no incluyen nombres de medicamentos ni síntomas.
-- **LLM con minimización.** Se enmascaran RUT, teléfonos y correos; se puede usar un LLM local.
+- **Modelo 100 % local.** Por defecto `ollama` dentro de la red. Un proveedor externo queda bloqueado salvo
+  `LLM_ALLOW_EXTERNAL=true` y nunca recibe datos clínicos. Al NLU se le enmascaran RUT, teléfonos y correos.
+- **Sin datos de identidad por el chat.** RUN, claves y pagos nunca se piden por WhatsApp; la identidad se
+  verifica con ClaveÚnica (ver arriba).
 - **Endpoints internos** (`/dialog`, `/internal/*`) bloqueados en el gateway y protegidos con
   `INTERNAL_TOKEN`; el dashboard exige JWT; el login tiene límite de intentos.
+
+## Permisos del Módulo 1 (ficha clínica)
+
+1. **Quién:** solo roles clínicos (médico, enfermería, matrona, …) que ingresaron con **ClaveÚnica**. Las
+   cuentas locales (administración o gestión) y los roles administrativos reciben 403.
+2. **Sobre qué paciente:** el profesional debe tener **relación asistencial**, es decir, registros del
+   paciente en un establecimiento donde trabaja o una derivación activa hacia él. Sin relación, el acceso se
+   deniega con el motivo. Si el motivo es *urgencia*, se permite y queda marcado como **acceso excepcional**.
+3. **Auditoría:** cada consulta, permitida o denegada, queda en `historial.accesos` con profesional, rol,
+   paciente, bases, acción, motivo y resultado. Solo administración la revisa (`GET /api/historial/auditoria`).
+4. **Qué datos:** solo de las bases que el profesional seleccionó, cada uno con su cita. El RUN se muestra
+   enmascarado.
+
+## Identidad del paciente sin pedir datos por el chat
+
+```mermaid
+sequenceDiagram
+    participant P as Paciente (WhatsApp)
+    participant S as ms-resultados / derivacion / atencion
+    participant I as ms-identidad
+    participant C as ClaveÚnica
+    P->>S: «¿están mis exámenes?»
+    S->>I: ¿vínculo verificado para este WhatsApp?
+    I-->>S: no
+    S->>I: crear enlace de un solo uso (10 min)
+    S-->>P: «Entra con tu ClaveÚnica en este enlace seguro»
+    P->>I: abre /id/vincular/<token>
+    I->>C: authorize (state = token)
+    C-->>I: callback con code
+    I->>C: token + userinfo → RUN
+    I-->>P: (WhatsApp) «Identidad verificada» + botón para seguir
+```
 
 ## Indicadores que se calculan
 

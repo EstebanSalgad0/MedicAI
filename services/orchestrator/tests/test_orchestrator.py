@@ -45,6 +45,13 @@ def test_texto_en_tramite_no_pasa_por_nlu():
 def test_alarma_antes_que_todo():
     r = main.process(msg(text="no puedo respirar"))
     assert "131" in r.messages[0].text and r.meta["red_flag"] == "urgencia"
+    # traspaso humano obligatorio ante una emergencia
+    assert r.messages[1].options[0].id == "ate:humano:urgencia" and r.meta["human_handoff_offered"]
+
+
+def test_enlace_queda_como_texto_para_que_se_pueda_abrir():
+    out = main.system.with_menu_button([text("Entra aquí: https://medicai.test/id/vincular/x")])
+    assert out[0].type == "text" and out[1].options[0].id == "sys:menu"
 
 
 def test_handoff_entre_servicios():

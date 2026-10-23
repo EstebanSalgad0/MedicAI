@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from medicai_common import events
 from medicai_common.messages import buttons
@@ -27,6 +27,25 @@ DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
 def fmt_slot(dt: datetime) -> str:
     return f"{DIAS[dt.weekday()]} {dt:%d-%m} · {dt:%H:%M}"
+
+
+def criterio(db, wl: Waitlist) -> str:
+    """Explica brevemente por qué el cupo se ofrece a este paciente (prioridad clínica > GES >
+    orden de llegada) y a cuántos con más antigüedad se antepuso."""
+    antiguos = db.scalar(select(func.count()).select_from(Waitlist).where(
+        Waitlist.center_id == wl.center_id, Waitlist.prestacion == wl.prestacion, Waitlist.status == "waiting",
+        Waitlist.created_at < wl.created_at, Waitlist.priority < wl.priority)) or 0
+    desde = f"en espera desde el {wl.created_at:%d-%m-%Y}" if wl.created_at else "en espera"
+    if wl.priority >= 2:
+        base = (f"Prioridad clínica asignada por {wl.priority_by or 'el equipo'}"
+                f"{': ' + wl.priority_reason if wl.priority_reason else ''}")
+    elif wl.priority == 1:
+        base = "Garantía GES de oportunidad"
+    else:
+        return f"Orden de llegada: primer paciente compatible, {desde}."
+    salto = (f"; prevalece sobre el orden de llegada (se antepuso a {antiguos} paciente(s) con más antigüedad)"
+             if antiguos else "")
+    return f"{base}{salto}. {desde[0].upper() + desde[1:]}."[:300]
 
 
 def offer_gap(center_id: str, prestacion: str, slot: datetime) -> bool:
@@ -58,7 +77,7 @@ def offer_gap(center_id: str, prestacion: str, slot: datetime) -> bool:
                 if current.slot_at <= slot:
                     continue  # el cupo no es mejor que la hora que ya tiene
             offer = GapOffer(waitlist_id=wl.id, slot_at=slot, center_id=center_id, prestacion=prestacion,
-                             offered_at=now)
+                             offered_at=now, criterio=criterio(db, wl))
             db.add(offer)
             db.flush()
             antes = ""
@@ -73,7 +92,7 @@ def offer_gap(center_id: str, prestacion: str, slot: datetime) -> bool:
             if send(wl.user_id, [msg]):
                 db.commit()
                 events.emit("gap_offered", service=SERVICE, user_id=wl.user_id, center=center_id,
-                            props={"prestacion": prestacion, "priority": wl.priority})
+                            props={"prestacion": prestacion, "priority": wl.priority, "criterio": offer.criterio})
                 return True
             offer.status = "expired"  # no se pudo avisar: se prueba con el siguiente
         db.commit()

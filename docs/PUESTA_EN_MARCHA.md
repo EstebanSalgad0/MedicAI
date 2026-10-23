@@ -104,10 +104,18 @@ Para ver las peticiones que llegan por el túnel, abre http://127.0.0.1:4040 en 
 
 ## Paso 5: Probar
 
-- **Dashboard:** http://localhost:8080. Usuario y contraseña: `DASHBOARD_USER` y `DASHBOARD_PASSWORD` del `.env`.
+- **Dashboard:** http://localhost:8080.
+  - *Ingresar con ClaveÚnica* (en modo demo se abre un simulador): elige a la **Dra. Ana Rojas Vidal** para ver
+    la *Ficha clínica*. Consulta el RUN **12.345.678-5**, que tiene datos en CESFAM Las Américas y en el HRT.
+  - *Cuenta de administración*: `DASHBOARD_USER` y `DASHBOARD_PASSWORD` del `.env` (indicadores y agendas, sin fichas).
 - **WhatsApp:** escribe «hola» al número del bot. Debe reaccionar con 👀, mostrar «escribiendo…»
   y responder con el menú en pocos segundos.
-- **Simulador:** pestaña *Simulador* del dashboard. Prueba los flujos sin pasar por WhatsApp.
+- **Simulador:** pestaña *Simulador* del dashboard. Prueba los flujos sin pasar por WhatsApp. Los enlaces de
+  ClaveÚnica que envía el bot se pueden abrir desde el mismo simulador.
+
+> **Enlaces de ClaveÚnica por WhatsApp:** pon en `PUBLIC_BASE_URL` la URL pública del túnel o del dominio
+> (por ejemplo `https://<tu-dominio>.ngrok-free.app`) y aplica con `docker compose up -d`. Si queda en
+> `http://localhost:8080`, el enlace solo funciona en el mismo computador.
 
 ---
 
@@ -148,6 +156,10 @@ Variables del `.env` (ver `.env.example`):
 | `GAP_OFFER_MINUTES` | Minutos que tiene un paciente para tomar un cupo liberado antes de que pase al siguiente |
 | `REMINDER_LEAD_MINUTES` | Anticipación del aviso de cada toma de medicamento |
 | `LIS_MODE` | `demo` = laboratorio simulado para resultados de exámenes |
+| `CLAVEUNICA_MODE`, `PUBLIC_BASE_URL`, `PROFESIONALES` | Ingreso con ClaveÚnica (simulado en `demo`), URL de los enlaces que recibe el paciente y RUN habilitados para el dashboard |
+| `FUENTES_MODE`, `FUENTE_TIMEOUT_SECONDS` | Bases clínicas de cada establecimiento (`demo` o `fhir`) y espera máxima por base |
+| `LLM_PROVIDER`, `LLM_MODEL` | Modelo de lenguaje local (`ollama`); `docker compose --profile llm up -d ollama` para levantarlo |
+| `ASR_URL` | Servicio local de transcripción para la ficha por dictado (sin él, el dictado se escribe o se pega) |
 
 Después de cambiarlas: `docker compose up -d`.
 

@@ -31,21 +31,29 @@ def test_rut():
     assert rut.mask("12345678-5") == "12.***.**8-5"
 
 
-def test_verifica_identidad_y_no_muestra_valores():
-    fake = datetime(2026, 10, 21, 8, 0, tzinfo=TZ)
-    with patch.object(dialog, "now_local", lambda: fake):
+def test_sin_identidad_envia_enlace_de_claveunica_y_no_pide_run():
+    with patch.object(dialog.identidad, "vinculo", lambda u: None),          patch.object(dialog.identidad, "enlace", lambda u, p: ("https://medicai.test/id/vincular/x1", 10)):
         r = turn({})
-        assert r["state"]["step"] == "run"
-        r = turn(r["state"], text="12345678-9")
-        assert "no es válido" in r["messages"][0]["text"]
-        r = turn(r["state"], text="12.345.678-5")
-        r = turn(r["state"], text="01-02-1960")
+    body = r["messages"][0]["text"]
+    assert "ClaveÚnica" in body and "https://medicai.test/id/vincular/x1" in body
+    assert r["state"] is None and "Escribe tu" not in body
+
+
+def test_verificacion_antigua_se_vuelve_a_pedir():
+    viejo = {"run": "12345678-5", "nombre": "Ana", "horas_desde_verificacion": 30}
+    with patch.object(dialog.identidad, "vinculo", lambda u: viejo),          patch.object(dialog.identidad, "enlace", lambda u, p: ("https://medicai.test/id/vincular/x2", 10)):
+        r = turn({})
+    assert "ClaveÚnica" in r["messages"][0]["text"]
+
+
+def test_con_identidad_muestra_estado_sin_valores_y_avisa():
+    v = {"run": "12345678-5", "nombre": "Ana", "horas_desde_verificacion": 1}
+    fake = datetime(2026, 10, 21, 8, 0, tzinfo=TZ)
+    with patch.object(dialog.identidad, "vinculo", lambda u: v), patch.object(dialog, "now_local", lambda: fake):
+        r = turn({})
         body = r["messages"][0]["text"]
         assert "en proceso" in body and "disponible" in body and "no muestro valores" in body
         assert r["messages"][0]["options"][0]["id"] == "res:watch"
-        # la segunda consulta del día no vuelve a pedir datos
-        r = turn({})
-        assert "Exámenes" in r["messages"][0]["text"]
         r = turn({}, option_id="res:watch")
         assert r["events"][0]["type"] == "result_watch"
 
@@ -57,18 +65,8 @@ def test_verifica_identidad_y_no_muestra_valores():
     assert "ya está disponible" in sent[0][0].text
 
 
-def test_fecha_incorrecta_se_rechaza():
-    r = turn({}, user="569555")
-    r = turn(r["state"], text="11.111.111-1", user="569555")
-    r = turn(r["state"], text="05-05-1970", user="569555")
-    # vence la verificación: se vuelve a pedir y una fecha distinta no pasa
-    with patch.object(dialog, "VERIFY_HOURS", 0):
-        r = turn({}, user="569555")
-        assert r["state"]["step"] == "birth"
-        r = turn(r["state"], text="06-06-1971", user="569555")
-        assert "no coincide" in r["messages"][0]["text"]
-
-
 def test_modo_cuidador_usa_rut_del_paciente():
-    r = turn({}, user="cui:569666:12345678-5", name="Juan Pérez")
-    assert r["state"] == {"step": "birth", "run": "12345678-5"} and "Juan Pérez" in r["messages"][0]["text"]
+    fake = datetime(2026, 10, 21, 8, 0, tzinfo=TZ)
+    with patch.object(dialog, "now_local", lambda: fake):
+        r = turn({}, user="cui:569666:12345678-5", name="Juan Pérez")
+    assert "Juan Pérez" in r["messages"][0]["text"] and "12.***.**8-5" in r["messages"][0]["text"]

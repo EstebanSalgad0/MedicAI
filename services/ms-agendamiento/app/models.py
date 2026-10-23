@@ -47,7 +47,9 @@ class Waitlist(Base):
     center_id: Mapped[str] = mapped_column(String(40), index=True)
     prestacion: Mapped[str] = mapped_column(String(40), index=True)
     appointment_id: Mapped[int | None] = mapped_column(ForeignKey("appointments.id"))
-    priority: Mapped[int] = mapped_column(Integer, default=0)  # 1 = GES
+    priority: Mapped[int] = mapped_column(Integer, default=0)  # 0 orden de llegada · 1 GES · 2 prioridad clínica
+    priority_reason: Mapped[str | None] = mapped_column(String(200))  # motivo clínico registrado por el equipo
+    priority_by: Mapped[str | None] = mapped_column(String(160))  # responsable que asignó la prioridad
     status: Mapped[str] = mapped_column(String(15), default="waiting", index=True)  # waiting | booked | cancelled
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -65,8 +67,11 @@ class GapOffer(Base):
     status: Mapped[str] = mapped_column(String(15), default="offered", index=True)  # offered|accepted|declined|expired|taken
     offered_at: Mapped[datetime] = mapped_column(DateTime)
     answered_at: Mapped[datetime | None] = mapped_column(DateTime)
+    criterio: Mapped[str | None] = mapped_column(String(300))  # por qué se ofreció a este paciente
 
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
     ensure_columns(engine, "appointments", {"reminder_48_sent": "BOOLEAN DEFAULT FALSE", "ges": "VARCHAR(60)"})
+    ensure_columns(engine, "waitlist", {"priority_reason": "VARCHAR(200)", "priority_by": "VARCHAR(160)"})
+    ensure_columns(engine, "gap_offers", {"criterio": "VARCHAR(300)"})

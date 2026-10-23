@@ -51,23 +51,29 @@ def test_hablar_con_persona_crea_solicitud_con_contexto():
     assert out["status"] == "answered" and out["replies"][0]["text"] == "Hola Rosa, lo revisamos."
 
 
-def test_modo_cuidador_registro_y_activacion():
+def test_modo_cuidador_registro_por_claveunica_y_activacion():
     r = turn({}, option_id="ate:cui", user="hija")
     assert r["messages"][0]["options"][0]["id"] == "ate:cui:new"
-    r = turn({}, option_id="ate:cui:new", user="hija")
-    r = turn(r["state"], text="Camila Soto", user="hija")
-    r = turn(r["state"], text="12.345.678-9", user="hija")
-    assert "no es válido" in r["messages"][0]["text"]
-    r = turn(r["state"], text="12.345.678-5", user="hija")
-    r = turn(r["state"], text="Juan Soto", user="hija")
-    r = turn(r["state"], text="12.345.678-5", user="hija")
-    assert "distinto" in r["messages"][0]["text"]
-    r = turn(r["state"], text="11.111.111-1", user="hija")
-    r = turn(r["state"], option_id="ate:cui:rel:hijo", user="hija")
-    assert "Admisión" in r["messages"][0]["text"]
-    r = turn(r["state"], option_id="ate:cui:save:yes", user="hija")
-    act = r["messages"][0]["options"][0]["id"]
-    r = turn({}, option_id=act, user="hija")
+    # el registro no pide RUN por el chat: envía un enlace para ingresar con ClaveÚnica
+    with patch.object(dialog.identidad, "enlace", lambda u, p: ("https://medicai.test/id/vincular/abc", 10)):
+        r = turn({}, option_id="ate:cui:new", user="hija")
+    body = r["messages"][0]["text"]
+    assert "ClaveÚnica" in body and "https://medicai.test/id/vincular/abc" in body and r["state"] is None
+    assert "RUN" not in body.replace("Nunca te pediré tu RUN", "")
+
+    # ms-identidad completa el registro tras ClaveÚnica (formulario web)
+    cid = client.post("/internal/caregivers", json={
+        "caregiver_id": "hija", "caregiver_name": "Camila Soto", "caregiver_run": "12345678-5",
+        "patient_name": "Juan Soto", "patient_run": "11111111-1", "relationship": "Hijo/a"}).json()["id"]
+    r = turn({}, option_id=f"ate:cui:act:{cid}", user="hija")
     assert r["acting"] == {"id": "cui:hija:11111111-1", "name": "Juan Soto"}
     r = turn({}, option_id="ate:cui:exit", user="hija")
     assert r["acting"] == {}
+
+
+def test_emergencia_crea_solicitud_urgente_sin_preguntas():
+    r = turn({}, option_id="ate:humano:urgencia", entities={"transcript": ["Paciente: me duele el pecho"]})
+    assert "131" in r["messages"][0]["text"] and r["state"] is None
+    t = client.get("/tickets", params={"status": "open"}).json()["items"]
+    t = next(x for x in t if x["topic"] == "urgencia")
+    assert t["transcript"] == ["Paciente: me duele el pecho"]

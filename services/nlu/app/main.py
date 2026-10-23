@@ -13,6 +13,7 @@ import httpx
 from fastapi import Depends
 from pydantic import BaseModel, Field
 
+from medicai_common import llm as common_llm
 from medicai_common.safety import red_flag
 from medicai_common.service import create_service, require_internal, setup_logging
 
@@ -97,4 +98,5 @@ def post_parse(body: ParseIn) -> ParseOut:
 @app.get("/intents", tags=["nlu"])
 def intents():
     return {"intents": INTENTS, "rasa_threshold": RASA_THRESHOLD,
-            "llm": {"provider": llm.PROVIDER, "model": llm.MODEL if llm.enabled() else None}}
+            "llm": {"provider": os.getenv("LLM_PROVIDER", "none"), "local": common_llm.is_local(),
+                    "model": os.getenv("LLM_MODEL") if llm.enabled() else None}}

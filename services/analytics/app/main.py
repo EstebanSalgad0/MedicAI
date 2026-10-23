@@ -12,12 +12,13 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import httpx
-import jwt
 from fastapi import Depends, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from medicai_common import auth
+from medicai_common.centros import ESTABLECIMIENTOS
 from medicai_common.service import create_service, require_internal, setup_logging
 from medicai_common.textutil import TZ
 
@@ -30,7 +31,6 @@ app = create_service(SERVICE, "Telemetría seudonimizada, indicadores del proyec
                      on_startup=init_db)
 
 SALT = os.getenv("ANALYTICS_SALT", "cambiar-en-produccion")
-JWT_SECRET = os.getenv("JWT_SECRET", "cambiar-en-produccion")
 JWT_HOURS = int(os.getenv("JWT_HOURS", "8"))
 USERS = {os.getenv("DASHBOARD_USER", "admin"): os.getenv("DASHBOARD_PASSWORD", "medicai")}
 # Cuentas adicionales opcionales, formato "usuario:clave,usuario2:clave2"
@@ -82,29 +82,32 @@ class LoginIn(BaseModel):
     password: str
 
 
+ADMIN_USER = os.getenv("DASHBOARD_USER", "admin")
+
+
 @app.post("/auth/login", tags=["auth"])
 def login(body: LoginIn):
+    """Cuentas locales de administración y gestión. No dan acceso a fichas clínicas: los
+    profesionales de salud ingresan con ClaveÚnica (ms-identidad)."""
     expected = USERS.get(body.username)
     if not expected or not hmac.compare_digest(expected, body.password):
         raise HTTPException(401, "Usuario o contraseña incorrectos")
-    exp = datetime.now(timezone.utc) + timedelta(hours=JWT_HOURS)
-    token = jwt.encode({"sub": body.username, "exp": exp}, JWT_SECRET, algorithm="HS256")
+    rol = "admin" if body.username == ADMIN_USER else "gestion"
+    f = auth.Funcionario(sub=body.username, nombre=body.username, rol=rol, metodo="local",
+                         establecimientos=[k for k, _, _ in ESTABLECIMIENTOS])
+    token, exp = auth.emitir(f, JWT_HOURS)
     return {"token": token, "expires_at": exp.isoformat(), "user": body.username}
 
 
 def current_user(authorization: str = Header(default="")) -> str:
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(401, "Falta token")
-    try:
-        return jwt.decode(authorization[7:], JWT_SECRET, algorithms=["HS256"])["sub"]
-    except jwt.PyJWTError:
-        raise HTTPException(401, "Token inválido o expirado") from None
+    return auth.funcionario(authorization).sub
 
 
 @app.get("/auth/verify", tags=["auth"])
-def verify(user: str = Depends(current_user)):
-    """Usado por el gateway nginx (auth_request) para proteger todas las rutas /api/."""
-    return {"user": user}
+def verify(f: auth.Funcionario = Depends(auth.funcionario)):
+    """Usado por el gateway nginx (auth_request) para proteger todas las rutas /api/, y por el
+    dashboard para saber el rol del funcionario."""
+    return {"user": f.sub, **f.claims(), "rol_nombre": auth.ROL_NOMBRE.get(f.rol, f.rol), "clinico": f.clinico}
 
 
 # ---------- consultas ----------

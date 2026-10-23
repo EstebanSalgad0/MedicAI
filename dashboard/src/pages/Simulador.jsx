@@ -5,13 +5,14 @@ function newSession() {
   return (crypto.randomUUID?.() || String(Math.random()).slice(2)).slice(0, 12);
 }
 
-/** Formato de WhatsApp (*negrita*, _cursiva_) sin usar innerHTML. */
+/** Formato de WhatsApp (*negrita*, _cursiva_, enlaces) sin usar innerHTML. */
 function WaText({ text }) {
-  const parts = String(text).split(/(\*[^*\n]+\*|_[^_\n]+_)/g);
+  const parts = String(text).split(/(https?:\/\/[^\s]+|\*[^*\n]+\*|_[^_\n]+_)/g);
   return parts.map((p, i) =>
-    /^\*[^*]+\*$/.test(p) ? <b key={i}>{p.slice(1, -1)}</b>
-      : /^_[^_]+_$/.test(p) ? <i key={i}>{p.slice(1, -1)}</i>
-        : p,
+    /^https?:\/\//.test(p) ? <a key={i} href={p} target="_blank" rel="noopener noreferrer">{p}</a>
+      : /^\*[^*]+\*$/.test(p) ? <b key={i}>{p.slice(1, -1)}</b>
+        : /^_[^_]+_$/.test(p) ? <i key={i}>{p.slice(1, -1)}</i>
+          : p,
   );
 }
 

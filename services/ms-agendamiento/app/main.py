@@ -5,10 +5,10 @@ from datetime import date, datetime, timedelta
 from typing import Literal
 
 from fastapi import Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
-from medicai_common import events
+from medicai_common import auth, events
 from medicai_common.centros import HOSPITAL
 from medicai_common.contracts import DialogRequest, DialogResponse
 from medicai_common.messages import buttons
@@ -17,7 +17,8 @@ from medicai_common.service import create_service, require_internal, setup_loggi
 from medicai_common.textutil import now_local
 
 from . import dialog, gap
-from .catalog import CENTRO_NOMBRE, CENTROS, ESPECIALIDADES_HRT, PRESTACION_NOMBRE, PRESTACIONES
+from .catalog import (CENTRO_NOMBRE, CENTROS, ESPECIALIDADES_HRT, HORARIOS, HORARIOS_HRT, PRESTACION_NOMBRE,
+                      PRESTACIONES, PRIORIDAD_NOMBRE, dotacion)
 from .models import Appointment, GapOffer, SessionLocal, Waitlist, init_db
 
 SERVICE = "agendamiento"
@@ -65,6 +66,7 @@ def catalog():
         + [{"id": HOSPITAL[0], "nombre": HOSPITAL[1], "comuna": HOSPITAL[2], "tipo": "hospital"}],
         "prestaciones": [{"id": k, "nombre": PRESTACION_NOMBRE[k]} for k, _ in PRESTACIONES],
         "especialidades": [{"id": k, "nombre": PRESTACION_NOMBRE[k]} for k, _ in ESPECIALIDADES_HRT],
+        "dotacion": {k: dotacion(k) for k in CENTRO_NOMBRE},
     }
 
 
@@ -189,8 +191,87 @@ def waitlist(status: str = "waiting", limit: int = 200):
         return [{"id": w.id, "patient_name": w.patient_name, "channel": w.channel, "center_id": w.center_id,
                  "center_nombre": CENTRO_NOMBRE.get(w.center_id, w.center_id), "prestacion": w.prestacion,
                  "prestacion_nombre": PRESTACION_NOMBRE.get(w.prestacion, w.prestacion),
-                 "earlier": bool(w.appointment_id), "priority": w.priority, "offers": offers[w.id],
+                 "earlier": bool(w.appointment_id), "priority": w.priority,
+                 "priority_nombre": PRIORIDAD_NOMBRE.get(w.priority, str(w.priority)),
+                 "priority_reason": w.priority_reason, "priority_by": w.priority_by, "offers": offers[w.id],
                  "created_at": w.created_at} for w in items]
+
+
+class PrioridadIn(BaseModel):
+    priority: Literal[0, 1, 2]
+    motivo: str | None = Field(default=None, max_length=200)
+
+
+@app.patch("/waitlist/{wl_id}", tags=["dashboard"])
+def set_priority(wl_id: int, body: PrioridadIn, f: auth.Funcionario = Depends(auth.requiere_agenda)):
+    """El equipo asigna prioridad clínica (prevalece sobre el orden de llegada). Queda registrado
+    quién la asignó y por qué; ese criterio se informa en cada oferta de cupo."""
+    if body.priority == 2 and not (body.motivo or "").strip():
+        raise HTTPException(422, "La prioridad clínica requiere un motivo.")
+    with SessionLocal() as db:
+        w = db.get(Waitlist, wl_id)
+        if not w or w.status != "waiting":
+            raise HTTPException(404, "No está en lista de espera")
+        w.priority, w.priority_reason, w.priority_by = body.priority, (body.motivo or None), f.firma
+        db.commit()
+    events.emit("waitlist_priority_set", service=SERVICE, center=w.center_id, props={"priority": body.priority})
+    return {"id": wl_id, "priority": body.priority, "priority_nombre": PRIORIDAD_NOMBRE[body.priority],
+            "priority_reason": body.motivo, "priority_by": f.firma}
+
+
+@app.get("/gap-offers", tags=["dashboard"])
+def gap_offers(limit: int = 50):
+    """Reasignaciones recientes con el criterio aplicado en cada una."""
+    with SessionLocal() as db:
+        rows = db.execute(select(GapOffer, Waitlist).join(Waitlist, GapOffer.waitlist_id == Waitlist.id)
+                          .order_by(GapOffer.id.desc()).limit(min(limit, 500))).all()
+        return [{"id": o.id, "slot_at": o.slot_at, "center_nombre": CENTRO_NOMBRE.get(o.center_id, o.center_id),
+                 "prestacion_nombre": PRESTACION_NOMBRE.get(o.prestacion, o.prestacion), "status": o.status,
+                 "offered_at": o.offered_at, "patient_name": w.patient_name, "priority": w.priority,
+                 "criterio": o.criterio} for o, w in rows]
+
+
+@app.get("/ocupacion", tags=["dashboard"])
+def ocupacion(center_id: str, fecha: date | None = None):
+    """Vista centralizada: todos los box y profesionales del centro, con cada cupo del día
+    (ocupado, ofrecido a la lista de espera, libre o ya pasado)."""
+    if center_id not in CENTRO_NOMBRE:
+        raise HTTPException(404, "Centro desconocido")
+    dia = fecha or now_local().date()
+    now = now_local().replace(tzinfo=None)
+    horarios = HORARIOS_HRT if center_id == HOSPITAL[0] else HORARIOS
+    start = datetime.combine(dia, datetime.min.time())
+    with SessionLocal() as db:
+        citas = {(a.prestacion, a.slot_at): a for a in db.scalars(select(Appointment).where(
+            Appointment.center_id == center_id, Appointment.slot_at >= start,
+            Appointment.slot_at < start + timedelta(days=1), Appointment.status != "cancelled"))}
+        ofertas = {(o.prestacion, o.slot_at) for o in db.scalars(select(GapOffer).where(
+            GapOffer.center_id == center_id, GapOffer.status == "offered", GapOffer.slot_at >= start,
+            GapOffer.slot_at < start + timedelta(days=1)))}
+    habil = dia.weekday() < 5
+    filas, total, usados = [], 0, 0
+    for d in dotacion(center_id):
+        slots = []
+        for h in horarios if habil else []:
+            hh, mm = map(int, h.split(":"))
+            t = datetime(dia.year, dia.month, dia.day, hh, mm)
+            a = citas.get((d["prestacion"], t))
+            if a:
+                estado = {"attended": "atendida", "no_show": "inasistencia"}.get(a.status, "ocupada")
+            elif (d["prestacion"], t) in ofertas:
+                estado = "ofrecida"
+            else:
+                estado = "pasada" if t < now else "libre"
+            slots.append({"hora": h, "estado": estado, "codigo": a.code if a else None,
+                          "paciente": a.patient_name if a else None})
+        ocup = sum(s["estado"] in ("ocupada", "atendida", "inasistencia", "ofrecida") for s in slots)
+        total, usados = total + len(slots), usados + ocup
+        filas.append({**d, "slots": slots, "ocupacion": round(ocup / len(slots), 3) if slots else None})
+    return {"center_id": center_id, "center_nombre": CENTRO_NOMBRE[center_id], "fecha": dia.isoformat(),
+            "habil": habil, "horarios": horarios if habil else [], "filas": filas,
+            "resumen": {"cupos": total, "usados": usados, "libres": total - usados,
+                        "ocupacion": round(usados / total, 3) if total else None},
+            "actualizado": now.isoformat(timespec="seconds")}
 
 
 # ---------- tareas programadas ----------
